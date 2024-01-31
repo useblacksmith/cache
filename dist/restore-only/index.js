@@ -169,7 +169,7 @@ exports.restoreCache = restoreCache;
  * @returns number returns cacheId if the cache was saved successfully and throws an error if save fails
  */
 function saveCache(paths, key, options, enableCrossOsArchive = false) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f, _g;
     return __awaiter(this, void 0, void 0, function* () {
         checkPaths(paths);
         checkKey(key);
@@ -189,12 +189,12 @@ function saveCache(paths, key, options, enableCrossOsArchive = false) {
             if (core.isDebug()) {
                 yield (0, tar_1.listTar)(archivePath, compressionMethod);
             }
-            const fileSizeLimit = 10 * 1024 * 1024 * 1024; // 10GB per repo limit
+            const fileSizeLimit = 25 * 1024 * 1024 * 1024; // 25GB per repo limit
             const archiveFileSize = utils.getArchiveFileSizeInBytes(archivePath);
             core.debug(`File Size: ${archiveFileSize}`);
             // For GHES, this check will take place in ReserveCache API with enterprise file size limit
             if (archiveFileSize > fileSizeLimit && !utils.isGhes()) {
-                throw new Error(`Cache size of ~${Math.round(archiveFileSize / (1024 * 1024))} MB (${archiveFileSize} B) is over the 10GB limit, not saving cache.`);
+                throw new Error(`Cache size of ~${Math.round(archiveFileSize / (1024 * 1024))} MB (${archiveFileSize} B) is over the 25GB limit, not saving cache.`);
             }
             core.debug('Reserving Cache');
             const reserveCacheResponse = yield cacheHttpClient.reserveCache(key, paths, {
@@ -212,7 +212,7 @@ function saveCache(paths, key, options, enableCrossOsArchive = false) {
                 throw new ReserveCacheError(`Unable to reserve cache with key ${key}, another job may be creating this cache. More details: ${(_e = reserveCacheResponse === null || reserveCacheResponse === void 0 ? void 0 : reserveCacheResponse.error) === null || _e === void 0 ? void 0 : _e.message}`);
             }
             core.debug(`Saving Cache (ID: ${cacheId})`);
-            yield cacheHttpClient.saveCache(cacheId, archivePath, options);
+            yield cacheHttpClient.saveCache(cacheId, archivePath, (_g = (_f = reserveCacheResponse.result) === null || _f === void 0 ? void 0 : _f.uploadUrls) !== null && _g !== void 0 ? _g : []);
         }
         catch (error) {
             const typedError = error;
@@ -294,12 +294,12 @@ const options_1 = __nccwpck_require__(6215);
 const requestUtils_1 = __nccwpck_require__(3981);
 const versionSalt = '1.0';
 function getCacheApiUrl(resource) {
-    const baseUrl = process.env['ACTIONS_CACHE_URL'] || '';
+    const baseUrl = process.env['BLACKSMITH_CACHE_URL'] || 'stagingapi.blacksmith.sh/cache';
     if (!baseUrl) {
         throw new Error('Cache Service Url not found, unable to restore cache.');
     }
-    const url = `${baseUrl}_apis/artifactcache/${resource}`;
-    core.debug(`Resource Url: ${url}`);
+    const url = `${baseUrl}/${resource}`;
+    core.debug(`Blacksmith cache resource URL: ${url}`);
     return url;
 }
 function createAcceptHeader(type, apiVersion) {
@@ -308,15 +308,17 @@ function createAcceptHeader(type, apiVersion) {
 function getRequestOptions() {
     const requestOptions = {
         headers: {
-            Accept: createAcceptHeader('application/json', '6.0-preview.1')
+            Accept: createAcceptHeader('application/json', '6.0-preview.1'),
+            'X-Github-Org-Name': process.env['GITHUB_ORG_NAME'],
+            'X-Github-Repo-Name': process.env['GITHUB_REPO_NAME']
         }
     };
     return requestOptions;
 }
 function createHttpClient() {
-    const token = process.env['ACTIONS_RUNTIME_TOKEN'] || '';
+    const token = process.env['BLACKSMITH_CACHE_TOKEN'] || '';
     const bearerCredentialHandler = new auth_1.BearerCredentialHandler(token);
-    return new http_client_1.HttpClient('actions/cache', [bearerCredentialHandler], getRequestOptions());
+    return new http_client_1.HttpClient('useblacksmith/cache', [bearerCredentialHandler], getRequestOptions());
 }
 function getCacheVersion(paths, compressionMethod, enableCrossOsArchive = false) {
     const components = paths;
@@ -444,26 +446,22 @@ function uploadChunk(httpClient, resourceUrl, openStream, start, end) {
         }
     });
 }
-function uploadFile(httpClient, cacheId, archivePath, options) {
+function uploadFile(httpClient, archivePath, urls) {
     return __awaiter(this, void 0, void 0, function* () {
         // Upload Chunks
         const fileSize = utils.getArchiveFileSizeInBytes(archivePath);
-        const resourceUrl = getCacheApiUrl(`caches/${cacheId.toString()}`);
         const fd = fs.openSync(archivePath, 'r');
-        const uploadOptions = (0, options_1.getUploadOptions)(options);
-        const concurrency = utils.assertDefined('uploadConcurrency', uploadOptions.uploadConcurrency);
-        const maxChunkSize = utils.assertDefined('uploadChunkSize', uploadOptions.uploadChunkSize);
-        const parallelUploads = [...new Array(concurrency).keys()];
+        const maxChunkSize = Math.ceil(fileSize / urls.length);
         core.debug('Awaiting all uploads');
         let offset = 0;
         try {
-            yield Promise.all(parallelUploads.map(() => __awaiter(this, void 0, void 0, function* () {
+            yield Promise.all(urls.map((url) => __awaiter(this, void 0, void 0, function* () {
                 while (offset < fileSize) {
                     const chunkSize = Math.min(fileSize - offset, maxChunkSize);
                     const start = offset;
                     const end = offset + chunkSize - 1;
                     offset += maxChunkSize;
-                    yield uploadChunk(httpClient, resourceUrl, () => fs
+                    yield uploadChunk(httpClient, url, () => fs
                         .createReadStream(archivePath, {
                         fd,
                         start,
@@ -490,11 +488,11 @@ function commitCache(httpClient, cacheId, filesize) {
         }));
     });
 }
-function saveCache(cacheId, archivePath, options) {
+function saveCache(cacheId, archivePath, urls) {
     return __awaiter(this, void 0, void 0, function* () {
         const httpClient = createHttpClient();
         core.debug('Upload cache');
-        yield uploadFile(httpClient, cacheId, archivePath, options);
+        yield uploadFile(httpClient, archivePath, urls);
         // Commit Cache
         core.debug('Commiting cache');
         const cacheSize = utils.getArchiveFileSizeInBytes(archivePath);
