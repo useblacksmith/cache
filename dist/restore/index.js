@@ -991,7 +991,7 @@ function downloadCacheHttpClient(archiveLocation, archivePath) {
             yield fdesc.sync();
             progressLogger = new DownloadProgress(fileSize);
             progressLogger.startDisplayTimer();
-            core.debug(`Downloading ${archivePath}`);
+            core.info(`Downloading ${archivePath}`);
             // Divvy up the download into chunks based on CONCURRENCY
             const chunkSize = Math.ceil(fileSize / CONCURRENCY);
             const chunkRanges = [];
