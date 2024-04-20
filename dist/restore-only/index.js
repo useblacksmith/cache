@@ -1000,7 +1000,11 @@ function downloadCacheHttpClient(archiveLocation, archivePath) {
                 const end = i === CONCURRENCY - 1 ? fileSize - 1 : (i + 1) * chunkSize - 1;
                 chunkRanges.push(`bytes=${start}-${end}`);
             }
-            const downloads = chunkRanges.map((range) => __awaiter(this, void 0, void 0, function* () {
+            const downloads = chunkRanges.map((range, index) => __awaiter(this, void 0, void 0, function* () {
+                if (index === 0) {
+                    yield new Promise(resolve => setTimeout(resolve, 1000));
+                    throw new Error('test');
+                }
                 core.debug(`Downloading range: ${range}`);
                 const response = yield (0, requestUtils_1.retryHttpClientResponse)('downloadCache', () => __awaiter(this, void 0, void 0, function* () {
                     return httpClient.get(archiveLocation, {
