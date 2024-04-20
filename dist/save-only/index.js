@@ -1005,6 +1005,9 @@ function downloadCacheHttpClient(archiveLocation, archivePath) {
                     yield new Promise(resolve => setTimeout(resolve, 4000));
                     throw new Error('test');
                 }
+                if (index === 1) {
+                    yield new Promise(resolve => setTimeout(resolve, 10000000));
+                }
                 core.debug(`Downloading range: ${range}`);
                 const response = yield (0, requestUtils_1.retryHttpClientResponse)('downloadCache', () => __awaiter(this, void 0, void 0, function* () {
                     return httpClient.get(archiveLocation, {
