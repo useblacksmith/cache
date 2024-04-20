@@ -1002,7 +1002,7 @@ function downloadCacheHttpClient(archiveLocation, archivePath) {
             }
             const downloads = chunkRanges.map((range, index) => __awaiter(this, void 0, void 0, function* () {
                 if (index === 0) {
-                    yield new Promise(resolve => setTimeout(resolve, 1000));
+                    yield new Promise(resolve => setTimeout(resolve, 4000));
                     throw new Error('test');
                 }
                 core.debug(`Downloading range: ${range}`);
@@ -1028,9 +1028,10 @@ function downloadCacheHttpClient(archiveLocation, archivePath) {
         finally {
             // Stop the progress logger regardless of whether the download succeeded or failed.
             // Not doing this will cause the entire action to halt if the download fails.
-            progressLogger === null || progressLogger === void 0 ? void 0 : progressLogger.stopDisplayTimer();
             try {
-                yield fdesc.close();
+                // eslint-disable-next-line no-unsafe-finally
+                throw new Error('fdesc failed to close');
+                progressLogger === null || progressLogger === void 0 ? void 0 : progressLogger.stopDisplayTimer();
             }
             catch (err) {
                 // Intentionally swallow any errors in closing the file descriptor.
