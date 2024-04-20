@@ -149,7 +149,9 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
         finally {
             // Try to delete the archive to save space
             try {
+                const before = Date.now();
                 yield unlinkWithTimeout(archivePath, 5000);
+                core.info(`cleaning up archive took ${Date.now() - before}ms`);
             }
             catch (error) {
                 core.debug(`Failed to delete archive: ${error}`);
