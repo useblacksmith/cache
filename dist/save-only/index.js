@@ -143,7 +143,12 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
             }
             else {
                 // Supress all non-validation cache related errors because caching should be optional
-                core.warning(`Failed to restore: ${error.message}`);
+                if (error.message.includes(`Cache service responded with 404`)) {
+                    core.info(`Did not get a cache hit; proceeding as an uncached run`);
+                }
+                else {
+                    core.warning(`Failed to restore: ${error.message}`);
+                }
             }
         }
         finally {
@@ -173,10 +178,10 @@ function unlinkWithTimeout(path, timeoutMs) {
         }
         catch (error) {
             if (error.message === 'Unlink operation timed out') {
-                core.warning('Unlink operation exceeded the timeout of ${timeoutMs}ms');
+                core.warning(`Unlink operation exceeded the timeout of ${timeoutMs}ms`);
             }
             else {
-                core.warning('Unlink operation failed:', error);
+                core.debug(`Failed to delete archive: ${error}`);
             }
             throw error;
         }
