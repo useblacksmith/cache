@@ -149,7 +149,7 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
         finally {
             // Try to delete the archive to save space
             try {
-                yield utils.unlinkFile(archivePath);
+                yield unlinkWithTimeout(archivePath, 5000);
             }
             catch (error) {
                 core.debug(`Failed to delete archive: ${error}`);
@@ -159,6 +159,27 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
     });
 }
 exports.restoreCache = restoreCache;
+function unlinkWithTimeout(path, timeoutMs) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const timeout = new Promise((_, reject) => {
+            setTimeout(() => {
+                reject(new Error('Unlink operation timed out'));
+            }, timeoutMs);
+        });
+        try {
+            yield Promise.race([utils.unlinkFile(path), timeout]);
+        }
+        catch (error) {
+            if (error.message === 'Unlink operation timed out') {
+                core.warning('Unlink operation exceeded the timeout of ${timeoutMs}ms');
+            }
+            else {
+                core.warning('Unlink operation failed:', error);
+            }
+            throw error;
+        }
+    });
+}
 /**
  * Saves a list of files with the specified key
  *
