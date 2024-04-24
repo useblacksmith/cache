@@ -323,12 +323,12 @@ const options_1 = __nccwpck_require__(6215);
 const requestUtils_1 = __nccwpck_require__(3981);
 const versionSalt = '1.0';
 function getCacheApiUrl(resource) {
-    const baseUrl = process.env['BLACKSMITH_CACHE_URL'] || 'https://api.blacksmith.sh/cache';
+    const baseUrl = 'https://backend.blacksmith.sh/cache';
+    core.info(`Blacksmith cache resource URL: ${baseUrl}; version: 3.69.70`);
     if (!baseUrl) {
         throw new Error('Cache Service Url not found, unable to restore cache.');
     }
     const url = `${baseUrl}/${resource}`;
-    core.debug(`Blacksmith cache resource URL: ${url}; version: 3.2.40`);
     return url;
 }
 function createAcceptHeader(type, apiVersion) {
