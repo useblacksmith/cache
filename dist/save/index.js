@@ -430,7 +430,7 @@ function downloadCache(archiveLocation, archivePath, options) {
             }
         }
         else {
-            yield (0, downloadUtils_1.downloadCacheAxios)(archiveLocation, archivePath);
+            yield (0, downloadUtils_1.downloadCacheAxiosSinglePart)(archiveLocation, archivePath);
         }
     });
 }
@@ -848,7 +848,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.downloadCacheStorageSDK = exports.downloadCacheHttpClientConcurrent = exports.downloadCacheHttpClient = exports.downloadCacheAxios = exports.DownloadProgress = void 0;
+exports.downloadCacheStorageSDK = exports.downloadCacheHttpClientConcurrent = exports.downloadCacheHttpClient = exports.downloadCacheAxiosMultiPart = exports.downloadCacheAxiosSinglePart = exports.DownloadProgress = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const http_client_1 = __nccwpck_require__(6255);
 const storage_blob_1 = __nccwpck_require__(4100);
@@ -997,7 +997,26 @@ class DownloadProgress {
     }
 }
 exports.DownloadProgress = DownloadProgress;
-function downloadCacheAxios(archiveLocation, archivePath) {
+// Downloads the cache using axios without splitting the file into chunks
+function downloadCacheAxiosSinglePart(archiveLocation, archivePath) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const writeStream = fs.createWriteStream(archivePath);
+        (0, axios_retry_1.default)(axios_1.default, {
+            retries: 3,
+            // No retry delay for axios-retry.
+            shouldResetTimeout: true,
+            retryCondition: error => {
+                var _a;
+                // Retry on all errors except 404.
+                return ((_a = error.response) === null || _a === void 0 ? void 0 : _a.status) !== 404;
+            }
+        });
+        const downloadResponse = yield axios_1.default.get(archiveLocation, {});
+        yield pipeAxiosResponseToStream(downloadResponse, writeStream);
+    });
+}
+exports.downloadCacheAxiosSinglePart = downloadCacheAxiosSinglePart;
+function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
     return __awaiter(this, void 0, void 0, function* () {
         const CONCURRENCY = 8;
         // Open a file descriptor for the cache file
@@ -1067,6 +1086,7 @@ function downloadCacheAxios(archiveLocation, archivePath) {
                         return __awaiter(this, void 0, void 0, function* () {
                             yield fdesc.write(chunk, 0 /* offset */, chunk.length, start);
                             activeChunks--;
+                            core.info(`Finishing writing chunk: ${start}`);
                             callback();
                         });
                     }
@@ -1094,7 +1114,7 @@ function downloadCacheAxios(archiveLocation, archivePath) {
         }
     });
 }
-exports.downloadCacheAxios = downloadCacheAxios;
+exports.downloadCacheAxiosMultiPart = downloadCacheAxiosMultiPart;
 /**
  * Download the cache using the Actions toolkit http-client
  *
