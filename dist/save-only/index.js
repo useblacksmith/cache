@@ -1064,10 +1064,11 @@ function downloadCacheAxios(archiveLocation, archivePath) {
                 const start = parseInt(range.split('=')[1].split('-')[0]);
                 yield response.data.pipe(reportProgress).pipe(new stream.Writable({
                     write(chunk, _encoding, callback) {
-                        fdesc.write(chunk, 0 /* offset */, chunk.length, start);
-                        core.info(`Finishing writing chunk: ${start}`);
-                        activeChunks--;
-                        callback();
+                        return __awaiter(this, void 0, void 0, function* () {
+                            yield fdesc.write(chunk, 0 /* offset */, chunk.length, start);
+                            activeChunks--;
+                            callback();
+                        });
                     }
                 }));
                 core.info(`Finished downloading range: ${range}`);
