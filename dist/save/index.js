@@ -1045,6 +1045,7 @@ function downloadCacheAxios(archiveLocation, archivePath) {
                 const end = i === CONCURRENCY - 1 ? fileSize - 1 : (i + 1) * chunkSize - 1;
                 chunkRanges.push(`bytes=${start}-${end}`);
             }
+            let activeChunks = chunkRanges.length;
             const downloads = chunkRanges.map((range) => __awaiter(this, void 0, void 0, function* () {
                 core.debug(`Downloading range: ${range}`);
                 const response = yield axios_1.default.get(archiveLocation, {
@@ -1064,12 +1065,18 @@ function downloadCacheAxios(archiveLocation, archivePath) {
                 yield response.data.pipe(reportProgress).pipe(new stream.Writable({
                     write(chunk, _encoding, callback) {
                         fdesc.write(chunk, 0 /* offset */, chunk.length, start);
+                        core.info(`Finishing writing chunk: ${start}`);
+                        activeChunks--;
                         callback();
                     }
                 }));
                 core.info(`Finished downloading range: ${range}`);
             }));
             yield Promise.all(downloads);
+            // Wait for all chunks to be written
+            while (activeChunks > 0) {
+                yield new Promise(resolve => setTimeout(resolve, 100));
+            }
         }
         catch (err) {
             core.warning(`Failed to download cache: ${err.message}`);
