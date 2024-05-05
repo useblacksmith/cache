@@ -1039,14 +1039,22 @@ function downloadCacheAxiosSinglePart(archiveLocation, archivePath) {
                 return ((_a = error.response) === null || _a === void 0 ? void 0 : _a.status) !== 404;
             }
         });
-        const downloadResponse = yield axios_1.default.get(archiveLocation, {
-            responseType: 'stream'
-        });
-        pipeAxiosResponseToStream(downloadResponse, fs.createWriteStream(archivePath, {
-            fd: fdesc.fd,
-            start: 0,
-            autoClose: true
-        }));
+        try {
+            const before = Date.now();
+            const downloadResponse = yield axios_1.default.get(archiveLocation, {
+                responseType: 'stream'
+            });
+            yield pipeAxiosResponseToStream(downloadResponse, fs.createWriteStream(archivePath, {
+                fd: fdesc.fd,
+                start: 0,
+                autoClose: false
+            }));
+            core.info(`Took ${Date.now() - before}ms to download; speed: ${downloadResponse.headers['content-length'] /
+                (Date.now() - before)} MB/s`);
+        }
+        finally {
+            yield fdesc.close();
+        }
     });
 }
 exports.downloadCacheAxiosSinglePart = downloadCacheAxiosSinglePart;
