@@ -1000,7 +1000,35 @@ exports.DownloadProgress = DownloadProgress;
 // Downloads the cache using axios without splitting the file into chunks
 function downloadCacheAxiosSinglePart(archiveLocation, archivePath) {
     return __awaiter(this, void 0, void 0, function* () {
-        const writeStream = fs.createWriteStream(archivePath);
+        const fdesc = yield fs.promises.open(archivePath, 'w+');
+        // Set file permissions so that other users can untar the cache
+        yield fdesc.chmod(0o644);
+        core.debug(`Downloading from ${archiveLocation} to ${archivePath}`);
+        const httpClient = new http_client_1.HttpClient('useblacksmith/cache');
+        const metadataResponse = yield (0, requestUtils_1.retryHttpClientResponse)('downloadCache', () => __awaiter(this, void 0, void 0, function* () {
+            return httpClient.get(archiveLocation, {
+                Range: 'bytes=0-1'
+            });
+        }));
+        // Abort download if no traffic received over the socket.
+        metadataResponse.message.socket.setTimeout(constants_1.SocketTimeout, () => {
+            metadataResponse.message.destroy();
+            core.debug(`Aborting download, socket timed out after ${constants_1.SocketTimeout} ms`);
+        });
+        const contentRangeHeader = metadataResponse.message.headers['content-range'];
+        if (!contentRangeHeader) {
+            throw new Error('Content-Range is not defined; unable to determine file size');
+        }
+        // Parse the total file size from the Content-Range header
+        const fileSize = parseInt(contentRangeHeader.split('/')[1]);
+        if (isNaN(fileSize)) {
+            throw new Error(`Content-Range is not a number; unable to determine file size: ${contentRangeHeader}`);
+        }
+        core.info(`File size: ${fileSize}`);
+        // Truncate the file to the correct size
+        yield fdesc.truncate(fileSize);
+        yield fdesc.sync();
+        // Configure axios-retry
         (0, axios_retry_1.default)(axios_1.default, {
             retries: 3,
             // No retry delay for axios-retry.
@@ -1014,7 +1042,11 @@ function downloadCacheAxiosSinglePart(archiveLocation, archivePath) {
         const downloadResponse = yield axios_1.default.get(archiveLocation, {
             responseType: 'stream'
         });
-        pipeAxiosResponseToStream(downloadResponse, writeStream);
+        pipeAxiosResponseToStream(downloadResponse, fs.createWriteStream(archivePath, {
+            fd: fdesc.fd,
+            start: 0,
+            autoClose: true
+        }));
     });
 }
 exports.downloadCacheAxiosSinglePart = downloadCacheAxiosSinglePart;
