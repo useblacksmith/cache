@@ -1011,8 +1011,10 @@ function downloadCacheAxiosSinglePart(archiveLocation, archivePath) {
                 return ((_a = error.response) === null || _a === void 0 ? void 0 : _a.status) !== 404;
             }
         });
-        const downloadResponse = yield axios_1.default.get(archiveLocation, {});
-        yield pipeAxiosResponseToStream(downloadResponse, writeStream);
+        const downloadResponse = yield axios_1.default.get(archiveLocation, {
+            responseType: 'stream'
+        });
+        pipeAxiosResponseToStream(downloadResponse, writeStream);
     });
 }
 exports.downloadCacheAxiosSinglePart = downloadCacheAxiosSinglePart;
