@@ -430,7 +430,7 @@ function downloadCache(archiveLocation, archivePath, options) {
             }
         }
         else {
-            yield (0, downloadUtils_1.downloadCacheHttpClientConcurrent)(archiveLocation, archivePath, downloadOptions);
+            yield (0, downloadUtils_1.downloadCacheHttpClient)(archiveLocation, archivePath);
         }
     });
 }
@@ -1233,6 +1233,8 @@ function downloadCacheHttpClient(archiveLocation, archivePath) {
             // Not doing this will cause the entire action to halt if the download fails.
             progressLogger === null || progressLogger === void 0 ? void 0 : progressLogger.stopDisplayTimer();
             try {
+                // Sleep for 1 second to make sure the file is fully written to disk
+                yield new Promise(resolve => setTimeout(resolve, 1000));
                 yield fdesc.close();
             }
             catch (err) {
