@@ -430,7 +430,7 @@ function downloadCache(archiveLocation, archivePath, options) {
             }
         }
         else {
-            yield (0, downloadUtils_1.downloadCacheAxiosSinglePart)(archiveLocation, archivePath);
+            yield (0, downloadUtils_1.downloadCacheHttpClientConcurrent)(archiveLocation, archivePath, downloadOptions);
         }
     });
 }
