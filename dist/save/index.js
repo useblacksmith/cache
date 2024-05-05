@@ -884,7 +884,16 @@ function pipeResponseToStream(response, output, progress) {
 }
 function pipeAxiosResponseToStream(response, output, progress) {
     return __awaiter(this, void 0, void 0, function* () {
-        yield response.data.pipe(output);
+        const reportProgress = new stream.Transform({
+            transform(chunk, _encoding, callback) {
+                if (progress) {
+                    progress.setReceivedBytes(progress.getTransferredBytes() + chunk.length);
+                }
+                this.push(chunk);
+                callback();
+            }
+        });
+        yield response.data.pipe(reportProgress).pipe(output);
     });
 }
 /**
@@ -991,6 +1000,7 @@ exports.DownloadProgress = DownloadProgress;
 function downloadCacheAxios(archiveLocation, archivePath) {
     return __awaiter(this, void 0, void 0, function* () {
         const CONCURRENCY = 8;
+        // Open a file descriptor for the cache file
         const fdesc = yield fs.promises.open(archivePath, 'w+');
         // Set file permissions so that other users can untar the cache
         yield fdesc.chmod(0o644);
@@ -1041,22 +1051,31 @@ function downloadCacheAxios(archiveLocation, archivePath) {
                     headers: { Range: range },
                     responseType: 'stream'
                 });
-                const writeStream = fs.createWriteStream(archivePath, {
-                    fd: fdesc.fd,
-                    start: parseInt(range.split('=')[1].split('-')[0]),
-                    autoClose: false
+                const reportProgress = new stream.Transform({
+                    transform(chunk, _encoding, callback) {
+                        if (progressLogger) {
+                            progressLogger.setReceivedBytes(progressLogger.getTransferredBytes() + chunk.length);
+                        }
+                        this.push(chunk);
+                        callback();
+                    }
                 });
-                yield pipeAxiosResponseToStream(response, writeStream, progressLogger);
-                core.debug(`Finished downloading range: ${range}`);
+                const start = parseInt(range.split('=')[1].split('-')[0]);
+                yield response.data.pipe(reportProgress).pipe(new stream.Writable({
+                    write(chunk, _encoding, callback) {
+                        fdesc.write(chunk, start /* offset */);
+                    }
+                }));
+                core.info(`Finished downloading range: ${range}`);
             }));
             yield Promise.all(downloads);
         }
         catch (err) {
-            core.warning(`Failed to download cache: ${err}`);
+            core.warning(`Failed to download cache: ${err.message}`);
             throw err;
         }
         finally {
-            progressLogger === null || progressLogger === void 0 ? void 0 : progressLogger.stopDisplayTimer();
+            progressLogger === null || progressLogger === void 0 ? void 0 : progressLogger.stopDisplayTimer(true);
             try {
                 yield fdesc.close();
             }
