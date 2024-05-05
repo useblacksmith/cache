@@ -884,16 +884,7 @@ function pipeResponseToStream(response, output, progress) {
 }
 function pipeAxiosResponseToStream(response, output, progress) {
     return __awaiter(this, void 0, void 0, function* () {
-        const reportProgress = new stream.Transform({
-            transform(chunk, _encoding, callback) {
-                if (progress) {
-                    progress.setReceivedBytes(progress.getTransferredBytes() + chunk.length);
-                }
-                this.push(chunk);
-                callback();
-            }
-        });
-        yield response.data.pipe(reportProgress).pipe(output);
+        yield response.data.pipe(output);
     });
 }
 /**
