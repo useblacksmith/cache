@@ -1252,7 +1252,9 @@ exports.downloadCacheHttpClient = downloadCacheHttpClient;
 function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options) {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
-        const archiveDescriptor = yield fs.promises.open(archivePath, 'w');
+        const archiveDescriptor = yield fs.promises.open(archivePath, 'w+');
+        // Set file permissions so that other users can untar the cache
+        yield archiveDescriptor.chmod(0o644);
         core.debug(`Downloading from ${archiveLocation} to ${archivePath}`);
         const httpClient = new http_client_1.HttpClient('actions/cache', undefined, {
             socketTimeout: options.timeoutInMs,
