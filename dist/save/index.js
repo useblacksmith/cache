@@ -884,6 +884,7 @@ function pipeResponseToStream(response, output, progress) {
 }
 function pipeAxiosResponseToStream(response, output, progress) {
     return __awaiter(this, void 0, void 0, function* () {
+        const pipeline = util.promisify(stream.pipeline);
         const reportProgress = new stream.Transform({
             transform(chunk, _encoding, callback) {
                 if (progress) {
@@ -893,7 +894,7 @@ function pipeAxiosResponseToStream(response, output, progress) {
                 callback();
             }
         });
-        yield response.data.pipe(reportProgress).pipe(output);
+        yield pipeline(response.data, reportProgress, output);
     });
 }
 /**
