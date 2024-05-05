@@ -884,7 +884,6 @@ function pipeResponseToStream(response, output, progress) {
 }
 function pipeAxiosResponseToStream(response, output, progress) {
     return __awaiter(this, void 0, void 0, function* () {
-        const pipeline = util.promisify(stream.pipeline);
         const reportProgress = new stream.Transform({
             transform(chunk, _encoding, callback) {
                 if (progress) {
@@ -894,7 +893,7 @@ function pipeAxiosResponseToStream(response, output, progress) {
                 callback();
             }
         });
-        yield pipeline(response.data, reportProgress, output);
+        yield response.data.pipe(reportProgress).pipe(output);
     });
 }
 /**
@@ -1000,7 +999,7 @@ class DownloadProgress {
 exports.DownloadProgress = DownloadProgress;
 function downloadCacheAxios(archiveLocation, archivePath) {
     return __awaiter(this, void 0, void 0, function* () {
-        const CONCURRENCY = 3;
+        const CONCURRENCY = 8;
         const fdesc = yield fs.promises.open(archivePath, 'w+');
         // Set file permissions so that other users can untar the cache
         yield fdesc.chmod(0o644);
@@ -1030,7 +1029,7 @@ function downloadCacheAxios(archiveLocation, archivePath) {
             if (isNaN(fileSize)) {
                 throw new Error(`Content-Range is not a number; unable to determine file size: ${contentRangeHeader}`);
             }
-            core.debug(`fileSize: ${fileSize}`);
+            core.info(`Cached file size: ${fileSize}`);
             // Truncate the file to the correct size
             yield fdesc.truncate(fileSize);
             yield fdesc.sync();
@@ -1048,7 +1047,8 @@ function downloadCacheAxios(archiveLocation, archivePath) {
             const downloads = chunkRanges.map((range) => __awaiter(this, void 0, void 0, function* () {
                 core.debug(`Downloading range: ${range}`);
                 const response = yield axios_1.default.get(archiveLocation, {
-                    headers: { Range: range }
+                    headers: { Range: range },
+                    responseType: 'stream'
                 });
                 const writeStream = fs.createWriteStream(archivePath, {
                     fd: fdesc.fd,
