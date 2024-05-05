@@ -1047,9 +1047,7 @@ function downloadCacheAxios(archiveLocation, archivePath) {
             const downloads = chunkRanges.map((range) => __awaiter(this, void 0, void 0, function* () {
                 core.debug(`Downloading range: ${range}`);
                 const response = yield axios_1.default.get(archiveLocation, {
-                    headers: { Range: range },
-                    responseType: 'stream',
-                    timeout: 30000
+                    headers: { Range: range }
                 });
                 const writeStream = fs.createWriteStream(archivePath, {
                     fd: fdesc.fd,
