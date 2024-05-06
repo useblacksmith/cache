@@ -1000,6 +1000,7 @@ exports.DownloadProgress = DownloadProgress;
 function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
     return __awaiter(this, void 0, void 0, function* () {
         const CONCURRENCY = 10;
+        core.info(`Downloading with ${CONCURRENCY} concurrent requests`);
         // Open a file descriptor for the cache file
         const fdesc = yield fs.promises.open(archivePath, 'w+');
         // Set file permissions so that other users can untar the cache
