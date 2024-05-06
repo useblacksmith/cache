@@ -1084,8 +1084,10 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
             progressLogger === null || progressLogger === void 0 ? void 0 : progressLogger.stopDisplayTimer(true);
             try {
                 // Sleep for 2 seconds to allow the file to be written to disk.
-                // await new Promise(resolve => setTimeout(resolve, 2000))
+                core.info('Sleeping for 2 seconds to allow the file to be written to disk.');
+                yield new Promise(resolve => setTimeout(resolve, 2000));
                 yield fdesc.close();
+                core.info('File closed');
             }
             catch (err) {
                 core.warning(`Failed to close file descriptor: ${err}`);
