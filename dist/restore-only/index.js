@@ -1060,16 +1060,19 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
                         callback();
                     }
                 });
-                yield response.data
-                    .pipe(reportProgress, {
-                    end: false
-                })
-                    .pipe(fs.createWriteStream(archivePath, {
-                    fd: fdesc.fd,
-                    start: parseInt(range.split('=')[1].split('-')[0]),
-                    autoClose: false
-                }), {
-                    end: false
+                yield new Promise((resolve, reject) => {
+                    stream.pipeline(response.data, reportProgress, fs.createWriteStream(archivePath, {
+                        fd: fdesc.fd,
+                        start: parseInt(range.split('=')[1].split('-')[0]),
+                        autoClose: false
+                    }), err => {
+                        if (err) {
+                            reject(err);
+                        }
+                        else {
+                            resolve(null);
+                        }
+                    });
                 });
                 core.info(`Finished downloading range: ${range}`);
             }));
