@@ -1165,7 +1165,7 @@ exports.downloadCacheAxiosMultiPart = downloadCacheAxiosMultiPart;
  */
 function downloadCacheHttpClient(archiveLocation, archivePath) {
     return __awaiter(this, void 0, void 0, function* () {
-        const CONCURRENCY = 8;
+        const CONCURRENCY = 1;
         const fdesc = yield fs.promises.open(archivePath, 'w+');
         // Set file permissions so that other users can untar the cache
         yield fdesc.chmod(0o644);
