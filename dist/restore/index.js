@@ -430,7 +430,7 @@ function downloadCache(archiveLocation, archivePath, options) {
             }
         }
         else {
-            yield (0, downloadUtils_1.downloadCacheHttpClient)(archiveLocation, archivePath);
+            yield (0, downloadUtils_1.downloadCacheAxiosMultiPart)(archiveLocation, archivePath);
         }
     });
 }
@@ -848,7 +848,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.downloadCacheStorageSDK = exports.downloadCacheHttpClientConcurrent = exports.downloadCacheHttpClient = exports.downloadCacheAxiosMultiPart = exports.downloadCacheAxiosSinglePart = exports.DownloadProgress = void 0;
+exports.downloadCacheStorageSDK = exports.downloadCacheHttpClientConcurrent = exports.downloadCacheHttpClient = exports.downloadCacheAxiosMultiPart = exports.DownloadProgress = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const http_client_1 = __nccwpck_require__(6255);
 const storage_blob_1 = __nccwpck_require__(4100);
@@ -997,67 +997,6 @@ class DownloadProgress {
     }
 }
 exports.DownloadProgress = DownloadProgress;
-// Downloads the cache using axios without splitting the file into chunks
-function downloadCacheAxiosSinglePart(archiveLocation, archivePath) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const fdesc = yield fs.promises.open(archivePath, 'w+');
-        // Set file permissions so that other users can untar the cache
-        yield fdesc.chmod(0o644);
-        core.debug(`Downloading from ${archiveLocation} to ${archivePath}`);
-        const httpClient = new http_client_1.HttpClient('useblacksmith/cache');
-        const metadataResponse = yield (0, requestUtils_1.retryHttpClientResponse)('downloadCache', () => __awaiter(this, void 0, void 0, function* () {
-            return httpClient.get(archiveLocation, {
-                Range: 'bytes=0-1'
-            });
-        }));
-        // Abort download if no traffic received over the socket.
-        metadataResponse.message.socket.setTimeout(constants_1.SocketTimeout, () => {
-            metadataResponse.message.destroy();
-            core.debug(`Aborting download, socket timed out after ${constants_1.SocketTimeout} ms`);
-        });
-        const contentRangeHeader = metadataResponse.message.headers['content-range'];
-        if (!contentRangeHeader) {
-            throw new Error('Content-Range is not defined; unable to determine file size');
-        }
-        // Parse the total file size from the Content-Range header
-        const fileSize = parseInt(contentRangeHeader.split('/')[1]);
-        if (isNaN(fileSize)) {
-            throw new Error(`Content-Range is not a number; unable to determine file size: ${contentRangeHeader}`);
-        }
-        core.info(`File size: ${fileSize}`);
-        // Truncate the file to the correct size
-        yield fdesc.truncate(fileSize);
-        yield fdesc.sync();
-        // Configure axios-retry
-        (0, axios_retry_1.default)(axios_1.default, {
-            retries: 3,
-            // No retry delay for axios-retry.
-            shouldResetTimeout: true,
-            retryCondition: error => {
-                var _a;
-                // Retry on all errors except 404.
-                return ((_a = error.response) === null || _a === void 0 ? void 0 : _a.status) !== 404;
-            }
-        });
-        try {
-            const before = Date.now();
-            const downloadResponse = yield axios_1.default.get(archiveLocation, {
-                responseType: 'stream'
-            });
-            yield pipeAxiosResponseToStream(downloadResponse, fs.createWriteStream(archivePath, {
-                fd: fdesc.fd,
-                start: 0,
-                autoClose: false
-            }));
-            core.info(`Took ${Date.now() - before}ms to download; speed: ${downloadResponse.headers['content-length'] /
-                (Date.now() - before)} MB/s`);
-        }
-        finally {
-            yield fdesc.close();
-        }
-    });
-}
-exports.downloadCacheAxiosSinglePart = downloadCacheAxiosSinglePart;
 function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
     return __awaiter(this, void 0, void 0, function* () {
         const CONCURRENCY = 8;
@@ -1106,7 +1045,6 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
                 const end = i === CONCURRENCY - 1 ? fileSize - 1 : (i + 1) * chunkSize - 1;
                 chunkRanges.push(`bytes=${start}-${end}`);
             }
-            let activeChunks = chunkRanges.length;
             const downloads = chunkRanges.map((range) => __awaiter(this, void 0, void 0, function* () {
                 core.debug(`Downloading range: ${range}`);
                 const response = yield axios_1.default.get(archiveLocation, {
@@ -1122,24 +1060,14 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
                         callback();
                     }
                 });
-                const start = parseInt(range.split('=')[1].split('-')[0]);
-                yield response.data.pipe(reportProgress).pipe(new stream.Writable({
-                    write(chunk, _encoding, callback) {
-                        return __awaiter(this, void 0, void 0, function* () {
-                            yield fdesc.write(chunk, 0 /* offset */, chunk.length, start);
-                            activeChunks--;
-                            core.info(`Finishing writing chunk: ${start}`);
-                            callback();
-                        });
-                    }
+                yield response.data.pipe(reportProgress).pipe(fs.createWriteStream(archivePath, {
+                    fd: fdesc.fd,
+                    start: parseInt(range.split('=')[1].split('-')[0]),
+                    autoClose: false
                 }));
                 core.info(`Finished downloading range: ${range}`);
             }));
             yield Promise.all(downloads);
-            // Wait for all chunks to be written
-            while (activeChunks > 0) {
-                yield new Promise(resolve => setTimeout(resolve, 100));
-            }
         }
         catch (err) {
             core.warning(`Failed to download cache: ${err.message}`);
@@ -1233,7 +1161,9 @@ function downloadCacheHttpClient(archiveLocation, archivePath) {
             // Not doing this will cause the entire action to halt if the download fails.
             progressLogger === null || progressLogger === void 0 ? void 0 : progressLogger.stopDisplayTimer();
             try {
-                // Sleep for 1 second to make sure the file is fully written to disk
+                // NB: We're unsure why we're sometimes seeing a "EBADF: Bad file descriptor" error here.
+                //     It seems to be related to the fact that the file descriptor is closed before all
+                //     the chunks are written to it. This is a workaround to avoid the error.
                 yield new Promise(resolve => setTimeout(resolve, 1000));
                 yield fdesc.close();
             }
