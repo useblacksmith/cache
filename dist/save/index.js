@@ -1076,6 +1076,8 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
         finally {
             progressLogger === null || progressLogger === void 0 ? void 0 : progressLogger.stopDisplayTimer(true);
             try {
+                // Sleep for 2 seconds to allow the file to be written to disk.
+                yield new Promise(resolve => setTimeout(resolve, 2000));
                 yield fdesc.close();
             }
             catch (err) {
