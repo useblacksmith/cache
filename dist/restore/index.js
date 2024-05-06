@@ -999,7 +999,7 @@ class DownloadProgress {
 exports.DownloadProgress = DownloadProgress;
 function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
     return __awaiter(this, void 0, void 0, function* () {
-        const CONCURRENCY = 8;
+        const CONCURRENCY = 10;
         // Open a file descriptor for the cache file
         const fdesc = yield fs.promises.open(archivePath, 'w+');
         // Set file permissions so that other users can untar the cache
@@ -1074,10 +1074,8 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
                         }
                     });
                 });
-                core.info(`Finished downloading range: ${range}`);
             }));
             yield Promise.all(downloads);
-            core.info('All chunks written');
         }
         catch (err) {
             core.warning(`Failed to download cache: ${err.message}`);
@@ -1086,8 +1084,11 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
         finally {
             progressLogger === null || progressLogger === void 0 ? void 0 : progressLogger.stopDisplayTimer(true);
             try {
+                // NB: We're unsure why we're sometimes seeing a "EBADF: Bad file descriptor" error here.
+                //     It seems to be related to the fact that, sometimes, the file descriptor is closed before all
+                //     the chunks are written to it. This is a workaround to avoid the error.
+                yield new Promise(resolve => setTimeout(resolve, 1000));
                 yield fdesc.close();
-                core.info('File closed');
             }
             catch (err) {
                 core.warning(`Failed to close file descriptor: ${err}`);
