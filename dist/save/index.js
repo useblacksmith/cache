@@ -1060,11 +1060,17 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
                         callback();
                     }
                 });
-                yield response.data.pipe(reportProgress).pipe(fs.createWriteStream(archivePath, {
+                yield response.data
+                    .pipe(reportProgress, {
+                    end: false
+                })
+                    .pipe(fs.createWriteStream(archivePath, {
                     fd: fdesc.fd,
                     start: parseInt(range.split('=')[1].split('-')[0]),
                     autoClose: false
-                }));
+                }), {
+                    end: false
+                });
                 core.info(`Finished downloading range: ${range}`);
             }));
             yield Promise.all(downloads);
@@ -1077,7 +1083,7 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
             progressLogger === null || progressLogger === void 0 ? void 0 : progressLogger.stopDisplayTimer(true);
             try {
                 // Sleep for 2 seconds to allow the file to be written to disk.
-                yield new Promise(resolve => setTimeout(resolve, 2000));
+                // await new Promise(resolve => setTimeout(resolve, 2000))
                 yield fdesc.close();
             }
             catch (err) {
