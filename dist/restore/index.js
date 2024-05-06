@@ -1074,6 +1074,7 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
                 core.info(`Finished downloading range: ${range}`);
             }));
             yield Promise.all(downloads);
+            core.info('All chunks written');
         }
         catch (err) {
             core.warning(`Failed to download cache: ${err.message}`);
