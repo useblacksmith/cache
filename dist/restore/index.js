@@ -1081,14 +1081,18 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
                 //   response.data.length, // length of the buffer being written
                 //   parseInt(range.split('=')[1].split('-')[0]) // position
                 // )
+                core.info(`Downloading range: ${range}`);
                 const finished = util.promisify(stream.finished);
                 const writer = fs.createWriteStream(archivePath, {
                     fd: chunkFileDesc.fd,
                     start: parseInt(range.split('=')[1].split('-')[0]),
-                    autoClose: true
+                    autoClose: false
                 });
                 yield response.data.pipe(reportProgress).pipe(writer);
+                core.info(`finished piping response to writer for chunk ${range}`);
                 yield finished(writer);
+                fdesc.close();
+                core.info(`finished closing writer for chunk ${range}`);
                 // const pipeline = util.promisify(stream.pipeline)
                 // await new Promise(async (resolve, reject) => {
                 //   return pipeline(
