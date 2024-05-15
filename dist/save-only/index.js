@@ -1003,7 +1003,7 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
         let CONCURRENCY = 10;
         if (((_a = process.env['GITHUB_REPO_NAME']) === null || _a === void 0 ? void 0 : _a.includes('alcionai')) ||
             ((_b = process.env['GITHUB_REPO_NAME']) === null || _b === void 0 ? void 0 : _b.includes('FastActions'))) {
-            CONCURRENCY = 1;
+            CONCURRENCY = 10;
         }
         if (CONCURRENCY > 1) {
             core.info(`Downloading with ${CONCURRENCY} concurrent requests`);
@@ -1042,6 +1042,8 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
             // Truncate the file to the correct size
             yield fdesc.truncate(fileSize);
             yield fdesc.sync();
+            // Now that we've truncated the file to the correct size, we can close the file descriptor.
+            yield fdesc.close();
             progressLogger = new DownloadProgress(fileSize);
             progressLogger.startDisplayTimer();
             core.info(`Downloading ${archivePath}`);
@@ -1068,6 +1070,7 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
                         callback();
                     }
                 });
+                const fdesc = yield fs.promises.open(archivePath, 'w+');
                 // progressLogger.setReceivedBytes(
                 //   progressLogger.getTransferredBytes() + response.data.length
                 // )
@@ -1082,9 +1085,10 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
                     stream.pipeline(response.data, reportProgress, fs.createWriteStream(archivePath, {
                         fd: fdesc.fd,
                         start: parseInt(range.split('=')[1].split('-')[0]),
-                        autoClose: false
+                        autoClose: true
                     }), err => {
                         if (err) {
+                            core.warning(`Failed to write chunk: ${err.message}`);
                             reject(err);
                         }
                         else {
@@ -1106,7 +1110,6 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
                 //     It seems to be related to the fact that, sometimes, the file descriptor is closed before all
                 //     the chunks are written to it. This is a workaround to avoid the error.
                 yield new Promise(resolve => setTimeout(resolve, 1000));
-                yield fdesc.close();
             }
             catch (err) {
                 core.warning(`Failed to close file descriptor: ${err}`);
