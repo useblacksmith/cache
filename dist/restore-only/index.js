@@ -998,9 +998,16 @@ class DownloadProgress {
 }
 exports.DownloadProgress = DownloadProgress;
 function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
+    var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
-        const CONCURRENCY = 1;
-        core.info(`Downloading with ${CONCURRENCY} concurrent requests`);
+        let CONCURRENCY = 10;
+        if (((_a = process.env['GITHUB_REPO_NAME']) === null || _a === void 0 ? void 0 : _a.includes('alcionai')) ||
+            ((_b = process.env['GITHUB_REPO_NAME']) === null || _b === void 0 ? void 0 : _b.includes('FastActions'))) {
+            CONCURRENCY = 1;
+        }
+        if (CONCURRENCY > 1) {
+            core.info(`Downloading with ${CONCURRENCY} concurrent requests`);
+        }
         // Open a file descriptor for the cache file
         const fdesc = yield fs.promises.open(archivePath, 'w+');
         // Set file permissions so that other users can untar the cache
