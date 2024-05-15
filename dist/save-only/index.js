@@ -1069,11 +1069,10 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
                     const writer = fs.createWriteStream(archivePath, {
                         fd: chunkFileDesc.fd,
                         start: parseInt(range.split('=')[1].split('-')[0]),
-                        autoClose: false
+                        autoClose: true
                     });
                     yield response.data.pipe(reportProgress).pipe(writer);
                     yield finished(writer);
-                    chunkFileDesc.close();
                 }
                 catch (err) {
                     core.warning(`Range ${range} failed to download: ${err.message}`);
