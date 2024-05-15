@@ -999,7 +999,7 @@ class DownloadProgress {
 exports.DownloadProgress = DownloadProgress;
 function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
     return __awaiter(this, void 0, void 0, function* () {
-        const CONCURRENCY = 10;
+        const CONCURRENCY = 1;
         core.info(`Downloading with ${CONCURRENCY} concurrent requests`);
         // Open a file descriptor for the cache file
         const fdesc = yield fs.promises.open(archivePath, 'w+');
@@ -1050,42 +1050,41 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
                 core.debug(`Downloading range: ${range}`);
                 const response = yield axios_1.default.get(archiveLocation, {
                     headers: { Range: range },
-                    responseType: 'blob'
+                    responseType: 'stream'
                 });
-                // const reportProgress = new stream.Transform({
-                //   transform(chunk, _encoding, callback) {
-                //     if (progressLogger) {
-                //       progressLogger.setReceivedBytes(
-                //         progressLogger.getTransferredBytes() + chunk.length
-                //       )
-                //     }
-                //     this.push(chunk)
-                //     callback()
-                //   }
-                // })
-                progressLogger.setReceivedBytes(progressLogger.getTransferredBytes() + response.data.length);
-                // Write the chunk to the file at the correct offset.
-                yield fdesc.write(response.data, 0, response.data.length, // length of the buffer being written
-                parseInt(range.split('=')[1].split('-')[0]) // position
-                );
-                // await new Promise((resolve, reject) => {
-                //   stream.pipeline(
-                //     response.data,
-                //     reportProgress,
-                //     fs.createWriteStream(archivePath, {
-                //       fd: fdesc.fd,
-                //       start: parseInt(range.split('=')[1].split('-')[0]),
-                //       autoClose: false
-                //     }),
-                //     err => {
-                //       if (err) {
-                //         reject(err)
-                //       } else {
-                //         resolve(null)
-                //       }
-                //     }
-                //   )
-                // })
+                const reportProgress = new stream.Transform({
+                    transform(chunk, _encoding, callback) {
+                        if (progressLogger) {
+                            progressLogger.setReceivedBytes(progressLogger.getTransferredBytes() + chunk.length);
+                        }
+                        this.push(chunk);
+                        callback();
+                    }
+                });
+                // progressLogger.setReceivedBytes(
+                //   progressLogger.getTransferredBytes() + response.data.length
+                // )
+                // // Write the chunk to the file at the correct offset.
+                // await fdesc.write(
+                //   response.data,
+                //   0,
+                //   response.data.length, // length of the buffer being written
+                //   parseInt(range.split('=')[1].split('-')[0]) // position
+                // )
+                yield new Promise((resolve, reject) => {
+                    stream.pipeline(response.data, reportProgress, fs.createWriteStream(archivePath, {
+                        fd: fdesc.fd,
+                        start: parseInt(range.split('=')[1].split('-')[0]),
+                        autoClose: false
+                    }), err => {
+                        if (err) {
+                            reject(err);
+                        }
+                        else {
+                            resolve(null);
+                        }
+                    });
+                });
             }));
             yield Promise.all(downloads);
         }
