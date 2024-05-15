@@ -1070,7 +1070,7 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
                         callback();
                     }
                 });
-                const fdesc = yield fs.promises.open(archivePath, 'w+');
+                const chunkFileDesc = yield fs.promises.open(archivePath, 'w+');
                 // progressLogger.setReceivedBytes(
                 //   progressLogger.getTransferredBytes() + response.data.length
                 // )
@@ -1081,21 +1081,34 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
                 //   response.data.length, // length of the buffer being written
                 //   parseInt(range.split('=')[1].split('-')[0]) // position
                 // )
-                yield new Promise((resolve, reject) => {
-                    stream.pipeline(response.data, reportProgress, fs.createWriteStream(archivePath, {
-                        fd: fdesc.fd,
-                        start: parseInt(range.split('=')[1].split('-')[0]),
-                        autoClose: true
-                    }), err => {
-                        if (err) {
-                            core.warning(`Failed to write chunk: ${err.message}`);
-                            reject(err);
-                        }
-                        else {
-                            resolve(null);
-                        }
-                    });
+                const finished = util.promisify(stream.finished);
+                const writer = fs.createWriteStream(archivePath, {
+                    fd: chunkFileDesc.fd,
+                    start: parseInt(range.split('=')[1].split('-')[0]),
+                    autoClose: true
                 });
+                yield response.data.pipe(reportProgress).pipe(writer);
+                yield finished(writer);
+                // const pipeline = util.promisify(stream.pipeline)
+                // await new Promise(async (resolve, reject) => {
+                //   return pipeline(
+                //     response.data,
+                //     reportProgress,
+                //     fs.createWriteStream(archivePath, {
+                //       fd: chunkFileDesc.fd,
+                //       start: parseInt(range.split('=')[1].split('-')[0]),
+                //       autoClose: true
+                //     }),
+                //     err => {
+                //       if (err) {
+                //         core.warning(`Failed to write chunk: ${err.message}`)
+                //         reject(err)
+                //       } else {
+                //         resolve(null)
+                //       }
+                //     }
+                //   )
+                // })
             }));
             yield Promise.all(downloads);
         }
@@ -1105,15 +1118,14 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
         }
         finally {
             progressLogger === null || progressLogger === void 0 ? void 0 : progressLogger.stopDisplayTimer(true);
-            try {
-                // NB: We're unsure why we're sometimes seeing a "EBADF: Bad file descriptor" error here.
-                //     It seems to be related to the fact that, sometimes, the file descriptor is closed before all
-                //     the chunks are written to it. This is a workaround to avoid the error.
-                yield new Promise(resolve => setTimeout(resolve, 1000));
-            }
-            catch (err) {
-                core.warning(`Failed to close file descriptor: ${err}`);
-            }
+            // try {
+            //   // NB: We're unsure why we're sometimes seeing a "EBADF: Bad file descriptor" error here.
+            //   //     It seems to be related to the fact that, sometimes, the file descriptor is closed before all
+            //   //     the chunks are written to it. This is a workaround to avoid the error.
+            //   await new Promise(resolve => setTimeout(resolve, 1000))
+            // } catch (err) {
+            //   core.warning(`Failed to close file descriptor: ${err}`)
+            // }
         }
     });
 }
