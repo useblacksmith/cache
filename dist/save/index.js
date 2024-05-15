@@ -1043,12 +1043,14 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
             // Divvy up the download into chunks based on CONCURRENCY
             const chunkSize = Math.ceil(fileSize / CONCURRENCY);
             const chunkRanges = [];
+            const fileDescriptors = [];
             for (let i = 0; i < CONCURRENCY; i++) {
                 const start = i * chunkSize;
                 const end = i === CONCURRENCY - 1 ? fileSize - 1 : (i + 1) * chunkSize - 1;
                 chunkRanges.push(`bytes=${start}-${end}`);
+                fileDescriptors.push(yield fs.promises.open(archivePath, 'r+'));
             }
-            const downloads = chunkRanges.map((range) => __awaiter(this, void 0, void 0, function* () {
+            const downloads = chunkRanges.map((range, index) => __awaiter(this, void 0, void 0, function* () {
                 core.debug(`Downloading range: ${range}`);
                 const response = yield axios_1.default.get(archiveLocation, {
                     headers: { Range: range },
@@ -1063,13 +1065,13 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
                         callback();
                     }
                 });
+                const chunkFileDesc = fileDescriptors[index];
                 try {
-                    const chunkFileDesc = yield fs.promises.open(archivePath, 'r+');
                     const finished = util.promisify(stream.finished);
                     const writer = fs.createWriteStream(archivePath, {
                         fd: chunkFileDesc.fd,
                         start: parseInt(range.split('=')[1].split('-')[0]),
-                        autoClose: true
+                        autoClose: false
                     });
                     yield response.data.pipe(reportProgress).pipe(writer);
                     yield finished(writer);
@@ -1077,6 +1079,16 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
                 catch (err) {
                     core.warning(`Range ${range} failed to download: ${err.message}`);
                     throw err;
+                }
+                finally {
+                    if (chunkFileDesc) {
+                        try {
+                            yield chunkFileDesc.close();
+                        }
+                        catch (err) {
+                            core.warning(`Failed to close file descriptor: ${err}`);
+                        }
+                    }
                 }
             }));
             yield Promise.all(downloads);
