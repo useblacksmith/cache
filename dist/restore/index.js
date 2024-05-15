@@ -1070,7 +1070,7 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
                         callback();
                     }
                 });
-                const chunkFileDesc = yield fs.promises.open(archivePath, 'w+');
+                const chunkFileDesc = yield fs.promises.open(archivePath, 'r+');
                 // progressLogger.setReceivedBytes(
                 //   progressLogger.getTransferredBytes() + response.data.length
                 // )
@@ -1091,7 +1091,7 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
                 yield response.data.pipe(reportProgress).pipe(writer);
                 core.info(`finished piping response to writer for chunk ${range}`);
                 yield finished(writer);
-                fdesc.close();
+                chunkFileDesc.close();
                 core.info(`finished closing writer for chunk ${range}`);
                 // const pipeline = util.promisify(stream.pipeline)
                 // await new Promise(async (resolve, reject) => {
