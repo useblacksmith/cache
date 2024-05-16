@@ -430,7 +430,8 @@ function downloadCache(archiveLocation, archivePath, options) {
             }
         }
         else {
-            yield (0, downloadUtils_1.downloadCacheAxiosMultiPart)(archiveLocation, archivePath);
+            yield (0, downloadUtils_1.downloadCacheHttpClientConcurrent)(archiveLocation, archivePath, downloadOptions);
+            // await downloadCacheAxiosMultiPart(archiveLocation, archivePath)
         }
     });
 }
