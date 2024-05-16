@@ -100,7 +100,7 @@ function reportFailure() {
         try {
             core.info('Reporting failure to api.blacksmith.sh');
             const httpClient = (0, cacheHttpClient_1.createHttpClient)();
-            yield promiseWithTimeout(10000, httpClient.postJson((0, cacheHttpClient_1.getCacheApiUrl)('report-failure'), {}));
+            yield promiseWithTimeout(10000, httpClient.postJson((0, cacheHttpClient_1.getCacheApiUrl)('report-failed'), {}));
         }
         catch (error) {
             core.warning('Failed to report failure to api.blacksmith.sh');
