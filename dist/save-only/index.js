@@ -98,6 +98,7 @@ const promiseWithTimeout = (timeoutMs, promise) => __awaiter(void 0, void 0, voi
 function reportFailure() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
+            core.info('Reporting failure to api.blacksmith.sh');
             const httpClient = (0, cacheHttpClient_1.createHttpClient)();
             yield promiseWithTimeout(10000, httpClient.postJson((0, cacheHttpClient_1.getCacheApiUrl)('/report-failure'), {}));
         }
@@ -156,7 +157,7 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
             core.info(`Cache Size: ~${Math.round(archiveFileSize / (1024 * 1024))} MB (${archiveFileSize} B)`);
             yield (0, tar_1.extractTar)(archivePath, compressionMethod);
             core.info('Cache restored successfully');
-            reportFailure();
+            yield reportFailure();
             return cacheEntry.cacheKey;
         }
         catch (error) {
@@ -171,7 +172,7 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
                 }
                 else {
                     core.warning(`Failed to restore: ${error.message}`);
-                    reportFailure();
+                    yield reportFailure();
                 }
             }
         }
