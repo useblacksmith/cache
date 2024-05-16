@@ -1212,14 +1212,24 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
             keepAlive: true
         });
         try {
-            const res = yield (0, requestUtils_1.retryHttpClientResponse)('downloadCacheMetadata', () => __awaiter(this, void 0, void 0, function* () { return yield httpClient.request('HEAD', archiveLocation, null, {}); }));
-            const lengthHeader = res.message.headers['content-length'];
-            if (lengthHeader === undefined || lengthHeader === null) {
-                throw new Error('Content-Length not found on blob response');
+            const metadataResponse = yield (0, requestUtils_1.retryHttpClientResponse)('downloadCache', () => __awaiter(this, void 0, void 0, function* () {
+                return httpClient.get(archiveLocation, {
+                    Range: 'bytes=0-1'
+                });
+            }));
+            // Abort download if no traffic received over the socket.
+            metadataResponse.message.socket.setTimeout(constants_1.SocketTimeout, () => {
+                metadataResponse.message.destroy();
+                core.debug(`Aborting download, socket timed out after ${constants_1.SocketTimeout} ms`);
+            });
+            const contentRangeHeader = metadataResponse.message.headers['content-range'];
+            if (!contentRangeHeader) {
+                throw new Error('Content-Range is not defined; unable to determine file size');
             }
-            const length = parseInt(lengthHeader);
-            if (Number.isNaN(length)) {
-                throw new Error(`Could not interpret Content-Length: ${length}`);
+            // Parse the total file size from the Content-Range header
+            const length = parseInt(contentRangeHeader.split('/')[1]);
+            if (isNaN(length)) {
+                throw new Error(`Content-Range is not a number; unable to determine file size: ${contentRangeHeader}`);
             }
             const downloads = [];
             const blockSize = 4 * 1024 * 1024;
