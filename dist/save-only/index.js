@@ -1280,7 +1280,10 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
             let nextDownload;
             const waitAndWrite = () => __awaiter(this, void 0, void 0, function* () {
                 const segment = yield Promise.race(Object.values(activeDownloads));
-                yield archiveDescriptor.write(segment.buffer, 0, segment.count, segment.offset);
+                const result = yield promiseWithTimeout(10000, archiveDescriptor.write(segment.buffer, 0, segment.count, segment.offset));
+                if (result === 'timeout') {
+                    throw new Error('Failed to write downloaded chunk to archivePath');
+                }
                 actives--;
                 delete activeDownloads[segment.offset];
                 bytesDownloaded += segment.count;
