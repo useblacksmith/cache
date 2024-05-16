@@ -1238,6 +1238,8 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
             socketTimeout: options.timeoutInMs,
             keepAlive: true
         });
+        const progress = new DownloadProgress(length);
+        progress.startDisplayTimer();
         try {
             const metadataResponse = yield (0, requestUtils_1.retryHttpClientResponse)('downloadCache', () => __awaiter(this, void 0, void 0, function* () {
                 return httpClient.get(archiveLocation, {
@@ -1273,8 +1275,6 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
             downloads.reverse();
             let actives = 0;
             let bytesDownloaded = 0;
-            const progress = new DownloadProgress(length);
-            progress.startDisplayTimer();
             const progressFn = progress.onProgress();
             const activeDownloads = [];
             let nextDownload;
@@ -1282,7 +1282,7 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
                 const segment = yield Promise.race(Object.values(activeDownloads));
                 const result = yield promiseWithTimeout(10000, archiveDescriptor.write(segment.buffer, 0, segment.count, segment.offset));
                 if (result === 'timeout') {
-                    throw new Error('Failed to write downloaded chunk to archivePath');
+                    throw new Error('Unable to download from cache using Blacksmith Actions http-client');
                 }
                 actives--;
                 delete activeDownloads[segment.offset];
@@ -1301,6 +1301,8 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
             }
         }
         finally {
+            // Stop the progress logger regardless of whether the download succeeded or failed.
+            // progress.stopDisplayTimer()
             httpClient.dispose();
             yield archiveDescriptor.close();
         }
@@ -1313,7 +1315,8 @@ function downloadSegmentRetry(httpClient, archiveLocation, offset, count) {
         let failures = 0;
         while (true) {
             try {
-                const timeout = 30000;
+                // const timeout = 30000
+                const timeout = 10000;
                 const result = yield promiseWithTimeout(timeout, downloadSegment(httpClient, archiveLocation, offset, count));
                 if (typeof result === 'string') {
                     throw new Error('downloadSegmentRetry failed due to timeout');
@@ -1331,6 +1334,11 @@ function downloadSegmentRetry(httpClient, archiveLocation, offset, count) {
 }
 function downloadSegment(httpClient, archiveLocation, offset, count) {
     return __awaiter(this, void 0, void 0, function* () {
+        if (offset > 1024 * 1024 * 1024) {
+            // Sleep for 45 seconds.
+            core.info(`TEST: sleeping for 45 seconds at offset ${offset}`);
+            yield new Promise(resolve => setTimeout(resolve, 45000));
+        }
         const partRes = yield (0, requestUtils_1.retryHttpClientResponse)('downloadCachePart', () => __awaiter(this, void 0, void 0, function* () {
             return yield httpClient.get(archiveLocation, {
                 Range: `bytes=${offset}-${offset + count - 1}`
