@@ -1,5 +1,6 @@
 import * as cache from "@actions/cache";
 import * as core from "@actions/core";
+import * as Sentry from '@sentry/node';
 
 import { Events, Inputs, Outputs, State } from "./constants";
 import {
@@ -82,6 +83,7 @@ export async function restoreImpl(
 
         return cacheKey;
     } catch (error: unknown) {
+        Sentry.captureException(error);
         core.setFailed((error as Error).message);
     }
 }
@@ -90,6 +92,9 @@ async function run(
     stateProvider: IStateProvider,
     earlyExit: boolean | undefined
 ): Promise<void> {
+    Sentry.init({
+        dsn: "https://2112a8b30794277b8507263f45740251@o4506462648401920.ingest.us.sentry.io/4507263470338048",
+    });
     try {
         await restoreImpl(stateProvider);
     } catch (err) {
