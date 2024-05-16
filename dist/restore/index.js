@@ -1229,6 +1229,7 @@ exports.downloadCacheHttpClient = downloadCacheHttpClient;
 function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options) {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
+        core.info('Downloading from cache using Blacksmith Actions http-client');
         const archiveDescriptor = yield fs.promises.open(archivePath, 'w+');
         // Set file permissions so that other users can untar the cache
         yield archiveDescriptor.chmod(0o644);
