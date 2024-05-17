@@ -1238,8 +1238,7 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
             socketTimeout: options.timeoutInMs,
             keepAlive: true
         });
-        const progress = new DownloadProgress(length);
-        progress.startDisplayTimer();
+        let progress;
         try {
             const metadataResponse = yield (0, requestUtils_1.retryHttpClientResponse)('downloadCache', () => __awaiter(this, void 0, void 0, function* () {
                 return httpClient.get(archiveLocation, {
@@ -1260,6 +1259,8 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
             if (isNaN(length)) {
                 throw new Error(`Content-Range is not a number; unable to determine file size: ${contentRangeHeader}`);
             }
+            progress = new DownloadProgress(length);
+            progress.startDisplayTimer();
             const downloads = [];
             const blockSize = 4 * 1024 * 1024;
             for (let offset = 0; offset < length; offset += blockSize) {
