@@ -1256,7 +1256,7 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
         let progress;
         const stallTimeout = setTimeout(() => {
             reportStall();
-        }, 30000);
+        }, 600000);
         stallTimeout.unref(); // Don't keep the process alive if the download is stalled.
         try {
             const metadataResponse = yield (0, requestUtils_1.retryHttpClientResponse)('downloadCache', () => __awaiter(this, void 0, void 0, function* () {
