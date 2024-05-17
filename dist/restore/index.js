@@ -888,6 +888,7 @@ const requestUtils_1 = __nccwpck_require__(3981);
 const abort_controller_1 = __nccwpck_require__(2557);
 const axios_retry_1 = __importDefault(__nccwpck_require__(8709));
 const axios_1 = __importDefault(__nccwpck_require__(8757));
+const cacheHttpClient_1 = __nccwpck_require__(8245);
 /**
  * Pipes the body of a HTTP response to a stream
  *
@@ -923,6 +924,18 @@ function pipeAxiosResponseToStream(response, output, progress) {
         yield response.data.pipe(reportProgress).pipe(output);
     });
 }
+function reportStall() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            core.info('Reporting stall to api.blacksmith.sh');
+            const httpClient = (0, cacheHttpClient_1.createHttpClient)();
+            yield promiseWithTimeout(10000, httpClient.postJson((0, cacheHttpClient_1.getCacheApiUrl)('report-stall'), {}));
+        }
+        catch (error) {
+            core.warning('Failed to report failure to api.blacksmith.sh');
+        }
+    });
+}
 /**
  * Class for tracking the download state and displaying stats.
  */
@@ -934,6 +947,7 @@ class DownloadProgress {
         this.segmentOffset = 0;
         this.receivedBytes = 0;
         this.displayedComplete = false;
+        this.highWaterTime = 0;
         this.startTime = Date.now();
     }
     /**
@@ -987,12 +1001,17 @@ class DownloadProgress {
         if (this.isDone()) {
             this.displayedComplete = true;
         }
+        // If highWaterTime is set, and is greater than 1 minute ago, log a warning.
+        if (this.highWaterTime > 0 && Date.now() - this.highWaterTime > 60000) {
+            core.debug('stall detected');
+        }
     }
     /**
      * Returns a function used to handle TransferProgressEvents.
      */
     onProgress() {
         return (progress) => {
+            this.highWaterTime = Date.now();
             this.setReceivedBytes(progress.loadedBytes);
         };
     }
@@ -1303,7 +1322,7 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
         }
         finally {
             // Stop the progress logger regardless of whether the download succeeded or failed.
-            // progress.stopDisplayTimer()
+            progress.stopDisplayTimer();
             httpClient.dispose();
             yield archiveDescriptor.close();
         }
@@ -1316,8 +1335,7 @@ function downloadSegmentRetry(httpClient, archiveLocation, offset, count) {
         let failures = 0;
         while (true) {
             try {
-                // const timeout = 30000
-                const timeout = 10000;
+                const timeout = 30000;
                 const result = yield promiseWithTimeout(timeout, downloadSegment(httpClient, archiveLocation, offset, count));
                 if (typeof result === 'string') {
                     throw new Error('downloadSegmentRetry failed due to timeout');
@@ -1335,11 +1353,6 @@ function downloadSegmentRetry(httpClient, archiveLocation, offset, count) {
 }
 function downloadSegment(httpClient, archiveLocation, offset, count) {
     return __awaiter(this, void 0, void 0, function* () {
-        if (offset > 1024 * 1024 * 1024) {
-            // Sleep for 45 seconds.
-            core.info(`TEST: sleeping for 45 seconds at offset ${offset}`);
-            yield new Promise(resolve => setTimeout(resolve, 45000));
-        }
         const partRes = yield (0, requestUtils_1.retryHttpClientResponse)('downloadCachePart', () => __awaiter(this, void 0, void 0, function* () {
             return yield httpClient.get(archiveLocation, {
                 Range: `bytes=${offset}-${offset + count - 1}`
