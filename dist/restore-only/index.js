@@ -927,7 +927,7 @@ function pipeAxiosResponseToStream(response, output, progress) {
 function reportStall() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            core.info('Reporting stall to api.blacksmith.sh');
+            core.debug('Reporting stall to api.blacksmith.sh');
             const httpClient = (0, cacheHttpClient_1.createHttpClient)();
             yield promiseWithTimeout(10000, httpClient.postJson((0, cacheHttpClient_1.getCacheApiUrl)('report-stall'), {}));
         }
@@ -1000,10 +1000,6 @@ class DownloadProgress {
         core.info(`Received ${transferredBytes} of ${this.contentLength} (${percentage}%), ${downloadSpeed} MBs/sec`);
         if (this.isDone()) {
             this.displayedComplete = true;
-        }
-        // If highWaterTime is set, and is greater than 1 minute ago, log a warning.
-        if (this.highWaterTime > 0 && Date.now() - this.highWaterTime > 60000) {
-            core.debug('stall detected');
         }
     }
     /**
@@ -1258,6 +1254,10 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
             keepAlive: true
         });
         let progress;
+        const stallTimeout = setTimeout(() => {
+            reportStall();
+        }, 30000);
+        stallTimeout.unref(); // Don't keep the process alive if the download is stalled.
         try {
             const metadataResponse = yield (0, requestUtils_1.retryHttpClientResponse)('downloadCache', () => __awaiter(this, void 0, void 0, function* () {
                 return httpClient.get(archiveLocation, {
@@ -1323,6 +1323,7 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
         finally {
             // Stop the progress logger regardless of whether the download succeeded or failed.
             progress.stopDisplayTimer();
+            clearTimeout(stallTimeout);
             httpClient.dispose();
             yield archiveDescriptor.close();
         }
