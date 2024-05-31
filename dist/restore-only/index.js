@@ -1322,7 +1322,9 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
         }
         finally {
             // Stop the progress logger regardless of whether the download succeeded or failed.
-            progress.stopDisplayTimer();
+            if (progress) {
+                progress.stopDisplayTimer();
+            }
             clearTimeout(stallTimeout);
             httpClient.dispose();
             yield archiveDescriptor.close();
