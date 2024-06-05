@@ -1281,7 +1281,7 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
             progress = new DownloadProgress(length);
             progress.startDisplayTimer();
             const downloads = [];
-            const blockSize = 4 * 1024 * 1024;
+            const blockSize = 12 * 1024 * 1024;
             for (let offset = 0; offset < length; offset += blockSize) {
                 const count = Math.min(blockSize, length - offset);
                 downloads.push({
@@ -1312,7 +1312,7 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
             while ((nextDownload = downloads.pop())) {
                 activeDownloads[nextDownload.offset] = nextDownload.promiseGetter();
                 actives++;
-                if (actives >= ((_a = options.downloadConcurrency) !== null && _a !== void 0 ? _a : 10)) {
+                if (actives >= ((_a = options.downloadConcurrency) !== null && _a !== void 0 ? _a : 4)) {
                     yield waitAndWrite();
                 }
             }
