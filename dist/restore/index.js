@@ -1312,7 +1312,7 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
             while ((nextDownload = downloads.pop())) {
                 activeDownloads[nextDownload.offset] = nextDownload.promiseGetter();
                 actives++;
-                if (actives >= ((_a = options.downloadConcurrency) !== null && _a !== void 0 ? _a : 10)) {
+                if (actives >= ((_a = options.downloadConcurrency) !== null && _a !== void 0 ? _a : 12)) {
                     yield waitAndWrite();
                 }
             }
@@ -1351,7 +1351,7 @@ function downloadSegmentRetry(httpClient, archiveLocation, offset, count) {
                 }
                 failures++;
                 // Jitter a bit before retrying
-                yield new Promise(resolve => setTimeout(resolve, Math.random() * 1000));
+                yield new Promise(resolve => setTimeout(resolve, Math.random() * 300));
                 core.info(`Retrying download segment ${offset} of ${count} (${failures} of ${retries})`);
             }
         }
