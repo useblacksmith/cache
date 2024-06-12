@@ -1338,7 +1338,7 @@ function downloadSegmentRetry(httpClient, archiveLocation, offset, count) {
         let failures = 0;
         while (true) {
             try {
-                const timeout = 60000;
+                const timeout = 10000;
                 const result = yield promiseWithTimeout(timeout, downloadSegment(httpClient, archiveLocation, offset, count));
                 if (typeof result === 'string') {
                     throw new Error('downloadSegmentRetry failed due to timeout');
@@ -1352,6 +1352,7 @@ function downloadSegmentRetry(httpClient, archiveLocation, offset, count) {
                 failures++;
                 // Jitter a bit before retrying
                 yield new Promise(resolve => setTimeout(resolve, Math.random() * 1000));
+                core.info(`Retrying download segment ${offset} of ${count} (${failures} of ${retries})`);
             }
         }
     });
