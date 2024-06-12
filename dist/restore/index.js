@@ -1281,7 +1281,7 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
             progress = new DownloadProgress(length);
             progress.startDisplayTimer();
             const downloads = [];
-            const blockSize = 3 * 1024 * 1024;
+            const blockSize = 2 * 1024 * 1024;
             for (let offset = 0; offset < length; offset += blockSize) {
                 const count = Math.min(blockSize, length - offset);
                 downloads.push({
@@ -1334,11 +1334,11 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
 exports.downloadCacheHttpClientConcurrent = downloadCacheHttpClientConcurrent;
 function downloadSegmentRetry(httpClient, archiveLocation, offset, count) {
     return __awaiter(this, void 0, void 0, function* () {
-        const retries = 3;
+        const retries = 4;
         let failures = 0;
         while (true) {
             try {
-                const timeout = 10000;
+                const timeout = 5000;
                 const result = yield promiseWithTimeout(timeout, downloadSegment(httpClient, archiveLocation, offset, count));
                 if (typeof result === 'string') {
                     throw new Error('downloadSegmentRetry failed due to timeout');
