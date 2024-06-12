@@ -1350,6 +1350,8 @@ function downloadSegmentRetry(httpClient, archiveLocation, offset, count) {
                     throw err;
                 }
                 failures++;
+                // Jitter a bit before retrying
+                yield new Promise(resolve => setTimeout(resolve, Math.random() * 1000));
             }
         }
     });
