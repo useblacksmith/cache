@@ -1334,11 +1334,11 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
 exports.downloadCacheHttpClientConcurrent = downloadCacheHttpClientConcurrent;
 function downloadSegmentRetry(httpClient, archiveLocation, offset, count) {
     return __awaiter(this, void 0, void 0, function* () {
-        const retries = 4;
+        const retries = 5;
         let failures = 0;
         while (true) {
             try {
-                const timeout = 5000;
+                const timeout = 15000;
                 const result = yield promiseWithTimeout(timeout, downloadSegment(httpClient, archiveLocation, offset, count));
                 if (typeof result === 'string') {
                     throw new Error('downloadSegmentRetry failed due to timeout');
