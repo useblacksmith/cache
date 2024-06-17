@@ -99,8 +99,11 @@ function reportFailure() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             core.info('Reporting failure to api.blacksmith.sh');
+            const message = `${process.env.GITHUB_JOB} failed for ${process.env.GITHUB_REPOSITORY} with run ID: ${process.env.GITHUB_RUN_ID}; Sender: ${process.env.GITHUB_TRIGGERING_ACTOR}`;
             const httpClient = (0, cacheHttpClient_1.createHttpClient)();
-            yield promiseWithTimeout(10000, httpClient.postJson((0, cacheHttpClient_1.getCacheApiUrl)('report-failed'), {}));
+            yield promiseWithTimeout(10000, httpClient.postJson((0, cacheHttpClient_1.getCacheApiUrl)('report-failed'), {
+                message
+            }));
         }
         catch (error) {
             core.warning('Failed to report failure to api.blacksmith.sh');
