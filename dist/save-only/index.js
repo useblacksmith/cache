@@ -160,6 +160,7 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
             core.info(`Cache Size: ~${Math.round(archiveFileSize / (1024 * 1024))} MB (${archiveFileSize} B)`);
             yield (0, tar_1.extractTar)(archivePath, compressionMethod);
             core.info('Cache restored successfully');
+            yield reportFailure();
             return cacheEntry.cacheKey;
         }
         catch (error) {
