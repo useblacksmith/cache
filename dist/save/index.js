@@ -1734,9 +1734,9 @@ function getTarArgs(tarPath, compressionMethod, type, archivePath = '') {
                     : cacheFileName.replace(new RegExp(`\\${path.sep}`, 'g'), '/'), '-P', '-C', workingDirectory.replace(new RegExp(`\\${path.sep}`, 'g'), '/'), '--files-from', constants_1.ManifestFilename);
                 break;
             case 'extract':
-                args.push('-xf', '--skip-old-files', BSD_TAR_ZSTD
+                args.push('-xf', BSD_TAR_ZSTD
                     ? tarFile
-                    : archivePath.replace(new RegExp(`\\${path.sep}`, 'g'), '/'), '-P', '-C', workingDirectory.replace(new RegExp(`\\${path.sep}`, 'g'), '/'));
+                    : archivePath.replace(new RegExp(`\\${path.sep}`, 'g'), '/'), '-P', '-C', workingDirectory.replace(new RegExp(`\\${path.sep}`, 'g'), '/'), '--skip-old-files');
                 break;
             case 'list':
                 args.push('-tf', BSD_TAR_ZSTD
