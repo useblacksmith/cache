@@ -1274,19 +1274,32 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
         }, 300000);
         stallTimeout.unref(); // Don't keep the process alive if the download is stalled.
         try {
-            const metadataResponse = yield (0, requestUtils_1.retryHttpClientResponse)('downloadCache', () => __awaiter(this, void 0, void 0, function* () {
-                return httpClient.get(archiveLocation, {
-                    Range: 'bytes=0-1'
+            let metadataResponse;
+            let contentRangeHeader;
+            let retries = 0;
+            const maxRetries = 2;
+            while (retries <= maxRetries) {
+                metadataResponse = yield (0, requestUtils_1.retryHttpClientResponse)('downloadCache', () => __awaiter(this, void 0, void 0, function* () {
+                    return httpClient.get(archiveLocation, {
+                        Range: 'bytes=0-1'
+                    });
+                }));
+                // Abort download if no traffic received over the socket.
+                metadataResponse.message.socket.setTimeout(constants_1.SocketTimeout, () => {
+                    metadataResponse.message.destroy();
+                    core.debug(`Aborting download, socket timed out after ${constants_1.SocketTimeout} ms`);
                 });
-            }));
-            // Abort download if no traffic received over the socket.
-            metadataResponse.message.socket.setTimeout(constants_1.SocketTimeout, () => {
-                metadataResponse.message.destroy();
-                core.debug(`Aborting download, socket timed out after ${constants_1.SocketTimeout} ms`);
-            });
-            const contentRangeHeader = metadataResponse.message.headers['content-range'];
+                contentRangeHeader = metadataResponse.message.headers['content-range'];
+                if (contentRangeHeader) {
+                    break;
+                }
+                retries++;
+                if (retries <= maxRetries) {
+                    core.debug(`Content-Range header not found. Retrying (${retries}/${maxRetries})...`);
+                }
+            }
             if (!contentRangeHeader) {
-                throw new Error('Content-Range is not defined; unable to determine file size');
+                throw new Error('Content-Range is not defined after retries; unable to determine file size');
             }
             // Parse the total file size from the Content-Range header
             const length = parseInt(contentRangeHeader.split('/')[1]);
@@ -1721,7 +1734,7 @@ function getTarArgs(tarPath, compressionMethod, type, archivePath = '') {
                     : cacheFileName.replace(new RegExp(`\\${path.sep}`, 'g'), '/'), '-P', '-C', workingDirectory.replace(new RegExp(`\\${path.sep}`, 'g'), '/'), '--files-from', constants_1.ManifestFilename);
                 break;
             case 'extract':
-                args.push('-xf', BSD_TAR_ZSTD
+                args.push('-xf', '--skip-old-files', BSD_TAR_ZSTD
                     ? tarFile
                     : archivePath.replace(new RegExp(`\\${path.sep}`, 'g'), '/'), '-P', '-C', workingDirectory.replace(new RegExp(`\\${path.sep}`, 'g'), '/'));
                 break;
