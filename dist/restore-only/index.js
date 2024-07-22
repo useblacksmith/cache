@@ -1064,12 +1064,25 @@ function downloadCacheAxiosMultiPart(archiveLocation, archivePath) {
         });
         try {
             core.debug(`Downloading from ${archiveLocation} to ${archivePath}`);
-            const metadataResponse = yield axios_1.default.get(archiveLocation, {
-                headers: { Range: 'bytes=0-1' }
-            });
-            const contentRangeHeader = metadataResponse.headers['content-range'];
+            let metadataResponse;
+            let contentRangeHeader;
+            let retries = 0;
+            const maxRetries = 2;
+            while (retries <= maxRetries) {
+                metadataResponse = yield axios_1.default.get(archiveLocation, {
+                    headers: { Range: 'bytes=0-1' }
+                });
+                contentRangeHeader = metadataResponse.headers['content-range'];
+                if (contentRangeHeader) {
+                    break;
+                }
+                retries++;
+                if (retries <= maxRetries) {
+                    core.debug(`Content-Range header not found. Retrying (${retries}/${maxRetries})...`);
+                }
+            }
             if (!contentRangeHeader) {
-                throw new Error('Content-Range is not defined; unable to determine file size');
+                throw new Error('Content-Range is not defined after retries; unable to determine file size');
             }
             // Parse the total file size from the Content-Range header
             const fileSize = parseInt(contentRangeHeader.split('/')[1]);
