@@ -1715,13 +1715,14 @@ function getTarPath() {
 }
 // Return arguments for tar as per tarPath, compressionMethod, method type and os
 function getTarArgs(tarPath, compressionMethod, type, archivePath = '') {
-    var _a;
+    var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
         const args = [`"${tarPath.path}"`];
         const cacheFileName = utils.getCacheFileName(compressionMethod);
         const tarFile = 'cache.tar';
         const workingDirectory = getWorkingDirectory();
-        const shouldSkipOldFiles = (_a = process.env['GITHUB_REPOSITORY']) === null || _a === void 0 ? void 0 : _a.includes('muzzapp');
+        const shouldSkipOldFiles = ((_a = process.env['GITHUB_REPOSITORY']) === null || _a === void 0 ? void 0 : _a.includes('muzzapp')) ||
+            ((_b = process.env['GITHUB_REPOSITORY']) === null || _b === void 0 ? void 0 : _b.includes('FastActions'));
         // Speficic args for BSD tar on windows for workaround
         const BSD_TAR_ZSTD = tarPath.type === constants_1.ArchiveToolType.BSD &&
             compressionMethod !== constants_1.CompressionMethod.Gzip &&
