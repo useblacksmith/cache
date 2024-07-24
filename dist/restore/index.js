@@ -1715,11 +1715,13 @@ function getTarPath() {
 }
 // Return arguments for tar as per tarPath, compressionMethod, method type and os
 function getTarArgs(tarPath, compressionMethod, type, archivePath = '') {
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
         const args = [`"${tarPath.path}"`];
         const cacheFileName = utils.getCacheFileName(compressionMethod);
         const tarFile = 'cache.tar';
         const workingDirectory = getWorkingDirectory();
+        const shouldSkipOldFiles = (_a = process.env['GITHUB_REPOSITORY']) === null || _a === void 0 ? void 0 : _a.includes('muzzapp');
         // Speficic args for BSD tar on windows for workaround
         const BSD_TAR_ZSTD = tarPath.type === constants_1.ArchiveToolType.BSD &&
             compressionMethod !== constants_1.CompressionMethod.Gzip &&
@@ -1737,6 +1739,9 @@ function getTarArgs(tarPath, compressionMethod, type, archivePath = '') {
                 args.push('-xf', BSD_TAR_ZSTD
                     ? tarFile
                     : archivePath.replace(new RegExp(`\\${path.sep}`, 'g'), '/'), '-P', '-C', workingDirectory.replace(new RegExp(`\\${path.sep}`, 'g'), '/'));
+                if (shouldSkipOldFiles) {
+                    args.push('--skip-old-files');
+                }
                 break;
             case 'list':
                 args.push('-tf', BSD_TAR_ZSTD
