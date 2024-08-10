@@ -1300,7 +1300,9 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
                 }
             }
             if (!contentRangeHeader) {
-                throw new Error('Content-Range is not defined after retries; unable to determine file size');
+                const headers = JSON.stringify(metadataResponse.message.headers);
+                const statusCode = metadataResponse.message.statusCode;
+                throw new Error(`Content-Range is not defined; unable to determine file size; Headers: ${headers}; Status Code: ${statusCode}`);
             }
             // Parse the total file size from the Content-Range header
             const length = parseInt(contentRangeHeader.split('/')[1]);
