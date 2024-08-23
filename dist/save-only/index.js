@@ -408,6 +408,7 @@ function getCacheEntry(keys, paths, options) {
         core.info(`Checking cache for keys ${keys.join(',')}`);
         while (retries <= maxRetries) {
             try {
+                const before = Date.now();
                 const response = yield axios_1.default.get(getCacheApiUrl(resource), {
                     headers: {
                         Accept: createAcceptHeader('application/json', '6.0-preview.1'),
@@ -416,6 +417,7 @@ function getCacheEntry(keys, paths, options) {
                     },
                     timeout: 10000 // 10 seconds timeout
                 });
+                core.debug(`Cache lookup took ${Date.now() - before}ms`);
                 // Cache not found
                 if (response.status === 204) {
                     // List cache for primary key only if cache miss occurs
