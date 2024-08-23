@@ -337,6 +337,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.saveCache = exports.reserveCache = exports.downloadCache = exports.getCacheEntry = exports.getCacheVersion = exports.createHttpClient = exports.getCacheApiUrl = void 0;
 const core = __importStar(__nccwpck_require__(2186));
@@ -349,6 +352,7 @@ const utils = __importStar(__nccwpck_require__(1518));
 const downloadUtils_1 = __nccwpck_require__(5500);
 const options_1 = __nccwpck_require__(6215);
 const requestUtils_1 = __nccwpck_require__(3981);
+const axios_1 = __importDefault(__nccwpck_require__(8757));
 const versionSalt = '1.0';
 function getCacheApiUrl(resource) {
     const baseUrl = process.env['BLACKSMITH_CACHE_URL'] || 'https://api.blacksmith.sh/cache';
@@ -397,31 +401,46 @@ function getCacheVersion(paths, compressionMethod, enableCrossOsArchive = false)
 exports.getCacheVersion = getCacheVersion;
 function getCacheEntry(keys, paths, options) {
     return __awaiter(this, void 0, void 0, function* () {
-        const httpClient = createHttpClient();
         const version = getCacheVersion(paths, options === null || options === void 0 ? void 0 : options.compressionMethod, options === null || options === void 0 ? void 0 : options.enableCrossOsArchive);
         const resource = `?keys=${encodeURIComponent(keys.join(','))}&version=${version}`;
-        const response = yield (0, requestUtils_1.retryTypedResponse)('getCacheEntry', () => __awaiter(this, void 0, void 0, function* () { return httpClient.getJson(getCacheApiUrl(resource)); }));
-        // Cache not found
-        if (response.statusCode === 204) {
-            // List cache for primary key only if cache miss occurs
-            if (core.isDebug()) {
-                yield printCachesListForDiagnostics(keys[0], httpClient, version);
+        try {
+            const response = yield axios_1.default.get(getCacheApiUrl(resource), {
+                headers: {
+                    Accept: createAcceptHeader('application/json', '6.0-preview.1'),
+                    'X-Github-Repo-Name': process.env['GITHUB_REPO_NAME'],
+                    Authorization: `Bearer ${process.env['BLACKSMITH_CACHE_TOKEN']}`
+                }
+            });
+            // Cache not found
+            if (response.status === 204) {
+                // List cache for primary key only if cache miss occurs
+                if (core.isDebug()) {
+                    yield printCachesListForDiagnostics(keys[0], createHttpClient(), version);
+                }
+                return null;
             }
-            return null;
+            if (response.status < 200 || response.status >= 300) {
+                throw new Error(`Cache service responded with ${response.status}`);
+            }
+            const cacheResult = response.data;
+            const cacheDownloadUrl = cacheResult === null || cacheResult === void 0 ? void 0 : cacheResult.archiveLocation;
+            if (!cacheDownloadUrl) {
+                // Cache archiveLocation not found. This should never happen, and hence bail out.
+                throw new Error('Cache not found.');
+            }
+            core.setSecret(cacheDownloadUrl);
+            core.debug(`Cache Result:`);
+            core.debug(JSON.stringify(cacheResult));
+            return cacheResult;
         }
-        if (!(0, requestUtils_1.isSuccessStatusCode)(response.statusCode)) {
-            throw new Error(`Cache service responded with ${response.statusCode}`);
+        catch (error) {
+            if (error.response) {
+                throw new Error(`Cache service responded with ${error.response.status}`);
+            }
+            else {
+                throw error;
+            }
         }
-        const cacheResult = response.result;
-        const cacheDownloadUrl = cacheResult === null || cacheResult === void 0 ? void 0 : cacheResult.archiveLocation;
-        if (!cacheDownloadUrl) {
-            // Cache achiveLocation not found. This should never happen, and hence bail out.
-            throw new Error('Cache not found.');
-        }
-        core.setSecret(cacheDownloadUrl);
-        core.debug(`Cache Result:`);
-        core.debug(JSON.stringify(cacheResult));
-        return cacheResult;
     });
 }
 exports.getCacheEntry = getCacheEntry;
