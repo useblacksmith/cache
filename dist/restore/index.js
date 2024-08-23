@@ -403,44 +403,61 @@ function getCacheEntry(keys, paths, options) {
     return __awaiter(this, void 0, void 0, function* () {
         const version = getCacheVersion(paths, options === null || options === void 0 ? void 0 : options.compressionMethod, options === null || options === void 0 ? void 0 : options.enableCrossOsArchive);
         const resource = `?keys=${encodeURIComponent(keys.join(','))}&version=${version}`;
-        try {
-            const response = yield axios_1.default.get(getCacheApiUrl(resource), {
-                headers: {
-                    Accept: createAcceptHeader('application/json', '6.0-preview.1'),
-                    'X-Github-Repo-Name': process.env['GITHUB_REPO_NAME'],
-                    Authorization: `Bearer ${process.env['BLACKSMITH_CACHE_TOKEN']}`
+        const maxRetries = 2;
+        let retries = 0;
+        core.info(`Checking cache for keys ${keys.join(',')}`);
+        while (retries <= maxRetries) {
+            try {
+                const response = yield axios_1.default.get(getCacheApiUrl(resource), {
+                    headers: {
+                        Accept: createAcceptHeader('application/json', '6.0-preview.1'),
+                        'X-Github-Repo-Name': process.env['GITHUB_REPO_NAME'],
+                        Authorization: `Bearer ${process.env['BLACKSMITH_CACHE_TOKEN']}`
+                    },
+                    timeout: 10000 // 10 seconds timeout
+                });
+                // Cache not found
+                if (response.status === 204) {
+                    // List cache for primary key only if cache miss occurs
+                    if (core.isDebug()) {
+                        yield printCachesListForDiagnostics(keys[0], createHttpClient(), version);
+                    }
+                    return null;
                 }
-            });
-            // Cache not found
-            if (response.status === 204) {
-                // List cache for primary key only if cache miss occurs
-                if (core.isDebug()) {
-                    yield printCachesListForDiagnostics(keys[0], createHttpClient(), version);
+                if (response.status < 200 || response.status >= 300) {
+                    throw new Error(`Cache service responded with ${response.status}`);
                 }
-                return null;
+                const cacheResult = response.data;
+                const cacheDownloadUrl = cacheResult === null || cacheResult === void 0 ? void 0 : cacheResult.archiveLocation;
+                if (!cacheDownloadUrl) {
+                    // Cache archiveLocation not found. This should never happen, and hence bail out.
+                    throw new Error('Cache not found.');
+                }
+                core.setSecret(cacheDownloadUrl);
+                core.debug(`Cache Result:`);
+                core.debug(JSON.stringify(cacheResult));
+                return cacheResult;
             }
-            if (response.status < 200 || response.status >= 300) {
-                throw new Error(`Cache service responded with ${response.status}`);
+            catch (error) {
+                if (error.response &&
+                    error.response.status >= 500 &&
+                    retries < maxRetries) {
+                    retries++;
+                    core.warning(`Retrying due to server error (attempt ${retries} of ${maxRetries})`);
+                    continue;
+                }
+                if (error.response) {
+                    throw new Error(`Cache service responded with ${error.response.status}`);
+                }
+                else if (error.code === 'ECONNABORTED') {
+                    throw new Error('Request timed out after 10 seconds');
+                }
+                else {
+                    throw error;
+                }
             }
-            const cacheResult = response.data;
-            const cacheDownloadUrl = cacheResult === null || cacheResult === void 0 ? void 0 : cacheResult.archiveLocation;
-            if (!cacheDownloadUrl) {
-                // Cache archiveLocation not found. This should never happen, and hence bail out.
-                throw new Error('Cache not found.');
-            }
-            core.setSecret(cacheDownloadUrl);
-            core.debug(`Cache Result:`);
-            core.debug(JSON.stringify(cacheResult));
-            return cacheResult;
         }
-        catch (error) {
-            if (error.response) {
-                throw new Error(`Cache service responded with ${error.response.status}`);
-            }
-            else {
-                throw error;
-            }
-        }
+        throw new Error(`Failed to get cache entry after ${maxRetries} retries`);
     });
 }
 exports.getCacheEntry = getCacheEntry;
