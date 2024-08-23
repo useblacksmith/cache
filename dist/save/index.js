@@ -1587,9 +1587,12 @@ function retry(name, method, getStatusCode, maxAttempts = constants_1.DefaultRet
                 isRetryable = isRetryableStatusCode(statusCode);
                 errorMessage = `Cache service responded with ${statusCode}`;
             }
+            if (!statusCode) {
+                isRetryable = true;
+            }
             core.debug(`${name} - Attempt ${attempt} of ${maxAttempts} failed with error: ${errorMessage}`);
             if (!isRetryable) {
-                core.warning(`${name} - Error is not retryable; Status Code: ${statusCode}`);
+                core.warning(`${name} - Error is not retryable; Status Code: ${statusCode}; Error: ${errorMessage}`);
                 break;
             }
             yield sleep(delay);
