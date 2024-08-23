@@ -1589,7 +1589,7 @@ function retry(name, method, getStatusCode, maxAttempts = constants_1.DefaultRet
             }
             core.debug(`${name} - Attempt ${attempt} of ${maxAttempts} failed with error: ${errorMessage}`);
             if (!isRetryable) {
-                core.debug(`${name} - Error is not retryable`);
+                core.warning(`${name} - Error is not retryable; Status Code: ${statusCode}`);
                 break;
             }
             yield sleep(delay);
