@@ -355,7 +355,7 @@ const requestUtils_1 = __nccwpck_require__(3981);
 const axios_1 = __importDefault(__nccwpck_require__(8757));
 const versionSalt = '1.0';
 function getCacheApiUrl(resource) {
-    const baseUrl = 'http://49.12.96.112/cache';
+    const baseUrl = 'http://188.34.176.224/cache';
     if (!baseUrl) {
         throw new Error('Cache Service Url not found, unable to restore cache.');
     }
