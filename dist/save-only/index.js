@@ -415,7 +415,7 @@ function getCacheEntry(keys, paths, options) {
                         'X-Github-Repo-Name': process.env['GITHUB_REPO_NAME'],
                         Authorization: `Bearer ${process.env['BLACKSMITH_CACHE_TOKEN']}`
                     },
-                    timeout: 10000 // 10 seconds timeout
+                    timeout: 3000 // 3 seconds timeout
                 });
                 core.debug(`Cache lookup took ${Date.now() - before}ms`);
                 // Cache not found
@@ -441,18 +441,19 @@ function getCacheEntry(keys, paths, options) {
                 return cacheResult;
             }
             catch (error) {
-                if (error.response &&
-                    error.response.status >= 500 &&
-                    retries < maxRetries) {
-                    retries++;
-                    core.warning(`Retrying due to server error (attempt ${retries} of ${maxRetries})`);
-                    continue;
+                if ((error.response && error.response.status >= 500) ||
+                    (error.code && error.code === 'ECONNABORTED')) {
+                    if (retries < maxRetries) {
+                        retries++;
+                        core.warning(`Retrying due to server error or timeout (attempt ${retries} of ${maxRetries})`);
+                        continue;
+                    }
                 }
                 if (error.response) {
                     throw new Error(`Cache service responded with ${error.response.status}`);
                 }
                 else if (error.code === 'ECONNABORTED') {
-                    throw new Error('Request timed out after 10 seconds');
+                    throw new Error('Request timed out after 3 seconds');
                 }
                 else {
                     throw error;
