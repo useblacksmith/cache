@@ -355,9 +355,10 @@ const requestUtils_1 = __nccwpck_require__(3981);
 const axios_1 = __importDefault(__nccwpck_require__(8757));
 const versionSalt = '1.0';
 function getCacheApiUrl(resource) {
-    const baseUrl = 'https://api.blacksmith.sh/cache';
-    if (!baseUrl) {
-        throw new Error('Cache Service Url not found, unable to restore cache.');
+    let baseUrl = 'https://api.blacksmith.sh/cache';
+    if (process.env.PETNAME && process.env.PETNAME.includes('staging')) {
+        baseUrl = 'https://stagingapi.blacksmith.sh/cache';
+        core.info('Using staging API');
     }
     const url = `${baseUrl}/${resource}`;
     return url;
