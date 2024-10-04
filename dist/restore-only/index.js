@@ -355,12 +355,17 @@ const requestUtils_1 = __nccwpck_require__(3981);
 const axios_1 = __importDefault(__nccwpck_require__(8757));
 const versionSalt = '1.0';
 function getCacheApiUrl(resource) {
-    let baseUrl = 'https://api.blacksmith.sh/cache';
-    if (process.env.PETNAME && process.env.PETNAME.includes('staging')) {
-        baseUrl = 'https://stagingapi.blacksmith.sh/cache';
-        core.info('Using staging API');
+    var _a, _b;
+    let baseUrl = process.env.BLACKSMITH_CACHE_URL;
+    if (!baseUrl) {
+        baseUrl = ((_a = process.env.PETNAME) === null || _a === void 0 ? void 0 : _a.includes('staging'))
+            ? 'https://stagingapi.blacksmith.sh/cache'
+            : 'https://api.blacksmith.sh/cache';
     }
     const url = `${baseUrl}/${resource}`;
+    if ((_b = process.env.PETNAME) === null || _b === void 0 ? void 0 : _b.includes('staging')) {
+        core.info(`Using staging API: ${url}`);
+    }
     return url;
 }
 exports.getCacheApiUrl = getCacheApiUrl;
@@ -405,7 +410,7 @@ function getCacheEntry(keys, paths, options) {
         const resource = `?keys=${encodeURIComponent(keys.join(','))}&version=${version}`;
         const maxRetries = 2;
         let retries = 0;
-        core.info(`Checking cache for keys ${keys.join(',')}`);
+        core.info(`Checking cache for keys ${keys.join(',')} and version ${version}`);
         while (retries <= maxRetries) {
             try {
                 const before = Date.now();
