@@ -122,6 +122,7 @@ function reportFailure() {
  * @returns string returns the key for the cache hit, otherwise returns undefined
  */
 function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArchive = false) {
+    var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
         checkPaths(paths);
         restoreKeys = restoreKeys || [];
@@ -169,13 +170,15 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
                 throw error;
             }
             else {
-                // Supress all non-validation cache related errors because caching should be optional
-                if (error.message.includes(`Cache service responded with 404`)) {
+                // Suppress all non-validation cache related errors because caching should be optional
+                if ((_a = typedError.message) === null || _a === void 0 ? void 0 : _a.includes(`Cache service responded with 404`)) {
                     core.info(`Did not get a cache hit; proceeding as an uncached run`);
                 }
                 else {
-                    core.warning(`Failed to restore: ${error.message}`);
-                    yield reportFailure();
+                    core.warning(`Failed to restore: ${typedError.message}`);
+                    if (!((_b = typedError.message) === null || _b === void 0 ? void 0 : _b.includes('File exists'))) {
+                        yield reportFailure();
+                    }
                 }
             }
         }
