@@ -122,7 +122,7 @@ function reportFailure() {
  * @returns string returns the key for the cache hit, otherwise returns undefined
  */
 function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArchive = false) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     return __awaiter(this, void 0, void 0, function* () {
         checkPaths(paths);
         restoreKeys = restoreKeys || [];
@@ -176,7 +176,7 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
                 }
                 else {
                     core.warning(`Failed to restore: ${typedError.message}`);
-                    if (!((_b = typedError.message) === null || _b === void 0 ? void 0 : _b.includes('File exists')) && !((_c = typedError.message) === null || _c === void 0 ? void 0 : _c.includes('Operation not permitted'))) {
+                    if (!((_b = typedError.message) === null || _b === void 0 ? void 0 : _b.includes('File exists')) && !((_c = typedError.message) === null || _c === void 0 ? void 0 : _c.includes('Operation not permitted')) && !((_d = typedError.message) === null || _d === void 0 ? void 0 : _d.includes('failed with exit code 2'))) {
                         yield reportFailure();
                     }
                 }
