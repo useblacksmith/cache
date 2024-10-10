@@ -46,7 +46,6 @@ const utils = __importStar(__nccwpck_require__(1518));
 const cacheHttpClient = __importStar(__nccwpck_require__(8245));
 const tar_1 = __nccwpck_require__(6490);
 const cacheHttpClient_1 = __nccwpck_require__(8245);
-const child_process_1 = __nccwpck_require__(2081);
 class ValidationError extends Error {
     constructor(message) {
         super(message);
@@ -101,15 +100,7 @@ function reportFailure() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             core.info('Reporting failure to api.blacksmith.sh');
-            // Run traceroute with a 1 second timeout and capture the output
-            let tracerouteOutput;
-            try {
-                tracerouteOutput = (0, child_process_1.execSync)(`timeout 1 traceroute ${process.env.BLACKSMITH_CACHE_URL}`, { encoding: 'utf8' }).trim();
-            }
-            catch (error) {
-                tracerouteOutput = `Error running traceroute: ${error.message}`;
-            }
-            const message = `${process.env.GITHUB_JOB} failed for ${process.env.GITHUB_REPOSITORY} with run ID: ${process.env.GITHUB_RUN_ID}; Sender: ${process.env.GITHUB_TRIGGERING_ACTOR}; VM ID: ${(_a = process.env.VM_ID) !== null && _a !== void 0 ? _a : 'unknown'}; petname: ${(_b = process.env.PETNAME) !== null && _b !== void 0 ? _b : 'unknown'}; Traceroute to BLACKSMITH_CACHE_URL: ${tracerouteOutput}`;
+            const message = `${process.env.GITHUB_JOB} failed for ${process.env.GITHUB_REPOSITORY} with run ID: ${process.env.GITHUB_RUN_ID}; Sender: ${process.env.GITHUB_TRIGGERING_ACTOR}; VM ID: ${(_a = process.env.VM_ID) !== null && _a !== void 0 ? _a : 'unknown'}; petname: ${(_b = process.env.PETNAME) !== null && _b !== void 0 ? _b : 'unknown'}`;
             const httpClient = (0, cacheHttpClient_1.createHttpClient)();
             yield promiseWithTimeout(10000, httpClient.postJson((0, cacheHttpClient_1.getCacheApiUrl)('report-failed'), {
                 message
