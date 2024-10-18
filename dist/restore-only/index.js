@@ -426,22 +426,39 @@ function fetchCacheBlobUsingCacheManager(keys, paths, destinationPath, options) 
             destinationPath
         });
         try {
-            const response = yield axios_1.default.post(cacheManagerEndpoint, formData, {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    Authorization: `Bearer ${process.env['BLACKSMITH_CACHE_TOKEN']}`,
-                    'X-Github-Repo-Name': process.env['GITHUB_REPO_NAME'] || ''
-                },
-                timeout: 10000 // 10 seconds timeout
-            });
-            if (response.status !== 200) {
-                throw new Error(`Cache service responded with ${response.status}`);
+            const startTime = Date.now();
+            const maxWaitTime = 120000; // 2 minutes in milliseconds
+            let result;
+            while (true) {
+                const response = yield axios_1.default.post(cacheManagerEndpoint, formData, {
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        Authorization: `Bearer ${process.env['BLACKSMITH_CACHE_TOKEN']}`,
+                        'X-Github-Repo-Name': process.env['GITHUB_REPO_NAME'] || ''
+                    },
+                    timeout: 10000 // 10 seconds timeout
+                });
+                if (response.status !== 200) {
+                    throw new Error(`Cache service responded with ${response.status}`);
+                }
+                result = response.data;
+                if (result.restoreStatus !== 'in_progress') {
+                    break;
+                }
+                if (Date.now() - startTime >= maxWaitTime) {
+                    throw new Error('Cache restore timed out after 2 minutes');
+                }
+                yield new Promise(resolve => setTimeout(resolve, 3000)); // Wait for 3 seconds before retrying
             }
-            const result = response.data;
             return result.restoreStatus;
         }
         catch (error) {
-            core.warning(`Failed to fetch cache blob: ${error}`);
+            if (error.code === 'ECONNREFUSED') {
+                core.warning('Connection to cache manager refused. Ensure the cache manager is running and accessible.');
+            }
+            else {
+                core.warning(`Failed to fetch cache blob: ${error}`);
+            }
             throw error;
         }
     });
