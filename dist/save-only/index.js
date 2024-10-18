@@ -136,25 +136,34 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
             checkKey(key);
         }
         const compressionMethod = yield utils.getCompressionMethod();
-        let archivePath = '';
+        const archivePath = path.join(yield utils.createTempDirectory(), utils.getCacheFileName(compressionMethod));
+        core.debug(`Archive Path: ${archivePath}`);
+        const useCacheManager = true;
+        let cacheEntry = null;
         try {
-            // path are needed to compute version
-            const cacheEntry = yield cacheHttpClient.getCacheEntry(keys, paths, {
-                compressionMethod,
-                enableCrossOsArchive
-            });
-            if (!(cacheEntry === null || cacheEntry === void 0 ? void 0 : cacheEntry.archiveLocation)) {
-                // Cache not found
-                return undefined;
+            if (useCacheManager) {
+                yield cacheHttpClient.fetchCacheBlobUsingCacheManager(keys, paths, archivePath, {
+                    compressionMethod,
+                    enableCrossOsArchive
+                });
             }
-            if (options === null || options === void 0 ? void 0 : options.lookupOnly) {
-                core.info('Lookup only - skipping download');
-                return cacheEntry.cacheKey;
+            else {
+                // path are needed to compute version
+                cacheEntry = yield cacheHttpClient.getCacheEntry(keys, paths, {
+                    compressionMethod,
+                    enableCrossOsArchive
+                });
+                if (!(cacheEntry === null || cacheEntry === void 0 ? void 0 : cacheEntry.archiveLocation)) {
+                    // Cache not found
+                    return undefined;
+                }
+                if (options === null || options === void 0 ? void 0 : options.lookupOnly) {
+                    core.info('Lookup only - skipping download');
+                    return cacheEntry.cacheKey;
+                }
+                // Download the cache from the cache entry
+                yield cacheHttpClient.downloadCache(cacheEntry.archiveLocation, archivePath, options);
             }
-            archivePath = path.join(yield utils.createTempDirectory(), utils.getCacheFileName(compressionMethod));
-            core.debug(`Archive Path: ${archivePath}`);
-            // Download the cache from the cache entry
-            yield cacheHttpClient.downloadCache(cacheEntry.archiveLocation, archivePath, options);
             if (core.isDebug()) {
                 yield (0, tar_1.listTar)(archivePath, compressionMethod);
             }
@@ -162,7 +171,7 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
             core.info(`Cache Size: ~${Math.round(archiveFileSize / (1024 * 1024))} MB (${archiveFileSize} B)`);
             yield (0, tar_1.extractTar)(archivePath, compressionMethod);
             core.info('Cache restored successfully');
-            return cacheEntry.cacheKey;
+            return cacheEntry === null || cacheEntry === void 0 ? void 0 : cacheEntry.cacheKey;
         }
         catch (error) {
             const typedError = error;
@@ -176,7 +185,9 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
                 }
                 else {
                     core.warning(`Failed to restore: ${typedError.message}`);
-                    if (!((_b = typedError.message) === null || _b === void 0 ? void 0 : _b.includes('File exists')) && !((_c = typedError.message) === null || _c === void 0 ? void 0 : _c.includes('Operation not permitted')) && !((_d = typedError.message) === null || _d === void 0 ? void 0 : _d.includes('failed with exit code 2'))) {
+                    if (!((_b = typedError.message) === null || _b === void 0 ? void 0 : _b.includes('File exists')) &&
+                        !((_c = typedError.message) === null || _c === void 0 ? void 0 : _c.includes('Operation not permitted')) &&
+                        !((_d = typedError.message) === null || _d === void 0 ? void 0 : _d.includes('failed with exit code 2'))) {
                         yield reportFailure();
                     }
                 }
@@ -342,7 +353,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.saveCache = exports.reserveCache = exports.downloadCache = exports.getCacheEntry = exports.getCacheVersion = exports.createHttpClient = exports.getCacheApiUrl = void 0;
+exports.saveCache = exports.reserveCache = exports.downloadCache = exports.getCacheEntry = exports.fetchCacheBlobUsingCacheManager = exports.getCacheVersion = exports.createHttpClient = exports.getCacheApiUrl = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const http_client_1 = __nccwpck_require__(6255);
 const auth_1 = __nccwpck_require__(5526);
@@ -405,6 +416,37 @@ function getCacheVersion(paths, compressionMethod, enableCrossOsArchive = false)
     return crypto.createHash('sha256').update(components.join('|')).digest('hex');
 }
 exports.getCacheVersion = getCacheVersion;
+function fetchCacheBlobUsingCacheManager(keys, paths, destinationPath, options) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const version = getCacheVersion(paths, options === null || options === void 0 ? void 0 : options.compressionMethod, options === null || options === void 0 ? void 0 : options.enableCrossOsArchive);
+        const cacheManagerEndpoint = 'http://192.168.127.1:5555/cache';
+        const formData = new URLSearchParams({
+            keys: keys.join(','),
+            version,
+            destinationPath
+        });
+        try {
+            const response = yield axios_1.default.post(cacheManagerEndpoint, formData, {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    Authorization: `Bearer ${process.env['BLACKSMITH_CACHE_TOKEN']}`,
+                    'X-Github-Repo-Name': process.env['GITHUB_REPO_NAME'] || ''
+                },
+                timeout: 10000 // 10 seconds timeout
+            });
+            if (response.status !== 200) {
+                throw new Error(`Cache service responded with ${response.status}`);
+            }
+            const result = response.data;
+            return result.restoreStatus;
+        }
+        catch (error) {
+            core.warning(`Failed to fetch cache blob: ${error}`);
+            throw error;
+        }
+    });
+}
+exports.fetchCacheBlobUsingCacheManager = fetchCacheBlobUsingCacheManager;
 function getCacheEntry(keys, paths, options) {
     return __awaiter(this, void 0, void 0, function* () {
         const version = getCacheVersion(paths, options === null || options === void 0 ? void 0 : options.compressionMethod, options === null || options === void 0 ? void 0 : options.enableCrossOsArchive);
