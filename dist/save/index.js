@@ -46,8 +46,6 @@ const utils = __importStar(__nccwpck_require__(1518));
 const cacheHttpClient = __importStar(__nccwpck_require__(8245));
 const tar_1 = __nccwpck_require__(6490);
 const cacheHttpClient_1 = __nccwpck_require__(8245);
-const child_process_1 = __nccwpck_require__(2081);
-const fs = __importStar(__nccwpck_require__(7147));
 class ValidationError extends Error {
     constructor(message) {
         super(message);
@@ -153,31 +151,8 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
                     core.info('Did not get a cache hit; proceeding as an uncached run');
                     return undefined;
                 }
-                archivePath = `/home/runner/blacksmith/${cacheId}`;
-                const doneFilePath = `/home/runner/blacksmith/${cacheId}_done`;
-                const errorFilePath = `/home/runner/blacksmith/${cacheId}_error`;
-                const startTime = Date.now();
-                const maxWaitTime = 120000; // 2 minutes in milliseconds
-                while (Date.now() - startTime < maxWaitTime) {
-                    try {
-                        (0, child_process_1.execSync)('sync /');
-                    }
-                    catch (error) {
-                        core.warning(`Failed to run sync command: ${error}`);
-                    }
-                    if (fs.existsSync(doneFilePath)) {
-                        core.info('Cache restore completed successfully');
-                        break;
-                    }
-                    if (fs.existsSync(errorFilePath)) {
-                        core.warning('Cache restore encountered an error');
-                        break;
-                    }
-                    yield new Promise(resolve => setTimeout(resolve, 500)); // Wait for 500ms before checking again
-                }
-                if (Date.now() - startTime >= maxWaitTime) {
-                    core.warning('Cache restore timed out after 2 minutes');
-                }
+                yield cacheHttpClient.downloadCacheBlob(cacheId);
+                archivePath = path.join('/home/runner/blacksmith', cacheId);
             }
             else {
                 // path are needed to compute version
@@ -382,7 +357,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.saveCache = exports.reserveCache = exports.downloadCache = exports.getCacheEntry = exports.fetchCacheBlobUsingCacheManager = exports.getCacheVersion = exports.createHttpClient = exports.getCacheApiUrl = void 0;
+exports.saveCache = exports.reserveCache = exports.downloadCache = exports.getCacheEntry = exports.fetchCacheBlobUsingCacheManager = exports.downloadCacheBlob = exports.getCacheVersion = exports.createHttpClient = exports.getCacheApiUrl = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const http_client_1 = __nccwpck_require__(6255);
 const auth_1 = __nccwpck_require__(5526);
@@ -445,6 +420,29 @@ function getCacheVersion(paths, compressionMethod, enableCrossOsArchive = false)
     return crypto.createHash('sha256').update(components.join('|')).digest('hex');
 }
 exports.getCacheVersion = getCacheVersion;
+function downloadCacheBlob(cacheId) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const archivePath = `/home/runner/blacksmith/${cacheId}`;
+        const cacheManagerEndpoint = `http://192.168.127.1:5555/cache/${cacheId}`;
+        try {
+            const response = yield (0, axios_1.default)({
+                method: 'get',
+                url: cacheManagerEndpoint,
+                responseType: 'stream'
+            });
+            const writer = fs.createWriteStream(archivePath);
+            response.data.pipe(writer);
+            return new Promise((resolve, reject) => {
+                writer.on('finish', resolve);
+                writer.on('error', reject);
+            });
+        }
+        catch (error) {
+            throw new Error(`Failed to download cache blob: ${error.message}`);
+        }
+    });
+}
+exports.downloadCacheBlob = downloadCacheBlob;
 function fetchCacheBlobUsingCacheManager(keys, paths, destinationPath, options) {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
