@@ -46,6 +46,7 @@ const utils = __importStar(__nccwpck_require__(1518));
 const cacheHttpClient = __importStar(__nccwpck_require__(8245));
 const tar_1 = __nccwpck_require__(6490);
 const cacheHttpClient_1 = __nccwpck_require__(8245);
+const fs = __importStar(__nccwpck_require__(7147));
 class ValidationError extends Error {
     constructor(message) {
         super(message);
@@ -136,19 +137,39 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
             checkKey(key);
         }
         const compressionMethod = yield utils.getCompressionMethod();
-        const archivePath = path.join(yield utils.createTempDirectory(), utils.getCacheFileName(compressionMethod));
+        // TODO(aayush): Clean this up.
+        let archivePath = path.join(yield utils.createTempDirectory(), utils.getCacheFileName(compressionMethod));
         core.debug(`Archive Path: ${archivePath}`);
         const useCacheManager = true;
         let cacheEntry = null;
         try {
             if (useCacheManager) {
-                const cacheHit = yield cacheHttpClient.fetchCacheBlobUsingCacheManager(keys, paths, archivePath, {
+                const cacheId = yield cacheHttpClient.fetchCacheBlobUsingCacheManager(keys, paths, archivePath, {
                     compressionMethod,
                     enableCrossOsArchive
                 });
-                if (!cacheHit) {
+                if (!cacheId) {
                     core.info('Did not get a cache hit; proceeding as an uncached run');
                     return undefined;
+                }
+                archivePath = path.join('/blacksmith', cacheId);
+                const doneFilePath = path.join('/blacksmith', `${cacheId}_done`);
+                const errorFilePath = path.join('/blacksmith', `${cacheId}_error`);
+                const startTime = Date.now();
+                const maxWaitTime = 120000; // 2 minutes in milliseconds
+                while (Date.now() - startTime < maxWaitTime) {
+                    if (fs.existsSync(doneFilePath)) {
+                        core.info('Cache restore completed successfully');
+                        break;
+                    }
+                    if (fs.existsSync(errorFilePath)) {
+                        core.warning('Cache restore encountered an error');
+                        break;
+                    }
+                    yield new Promise(resolve => setTimeout(resolve, 500)); // Wait for 500ms before checking again
+                }
+                if (Date.now() - startTime >= maxWaitTime) {
+                    core.warning('Cache restore timed out after 2 minutes');
                 }
             }
             else {
@@ -444,7 +465,7 @@ function fetchCacheBlobUsingCacheManager(keys, paths, destinationPath, options) 
             }
             catch (error) {
                 if ((0, axios_1.isAxiosError)(error) && ((_a = error.response) === null || _a === void 0 ? void 0 : _a.status) === 404) {
-                    return false;
+                    return undefined;
                 }
                 throw error;
             }
@@ -461,7 +482,7 @@ function fetchCacheBlobUsingCacheManager(keys, paths, destinationPath, options) 
             }
             yield new Promise(resolve => setTimeout(resolve, 3000)); // Wait for 3 seconds before retrying
         }
-        return true;
+        return response.cacheId;
     });
 }
 exports.fetchCacheBlobUsingCacheManager = fetchCacheBlobUsingCacheManager;
