@@ -142,10 +142,14 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
         let cacheEntry = null;
         try {
             if (useCacheManager) {
-                yield cacheHttpClient.fetchCacheBlobUsingCacheManager(keys, paths, archivePath, {
+                const cacheHit = yield cacheHttpClient.fetchCacheBlobUsingCacheManager(keys, paths, archivePath, {
                     compressionMethod,
                     enableCrossOsArchive
                 });
+                if (!cacheHit) {
+                    core.info('Did not get a cache hit; proceeding as an uncached run');
+                    return undefined;
+                }
             }
             else {
                 // path are needed to compute version
@@ -438,10 +442,14 @@ function fetchCacheBlobUsingCacheManager(keys, paths, destinationPath, options) 
                     },
                     timeout: 10000 // 10 seconds timeout
                 });
+                if (response.status === 404) {
+                    return false;
+                }
                 if (response.status !== 200) {
                     throw new Error(`Cache service responded with ${response.status}`);
                 }
                 result = response.data;
+                core.info(`Cache restore status: ${JSON.stringify(result)}`);
                 if (result.restoreStatus !== 'in_progress') {
                     break;
                 }
@@ -450,7 +458,7 @@ function fetchCacheBlobUsingCacheManager(keys, paths, destinationPath, options) 
                 }
                 yield new Promise(resolve => setTimeout(resolve, 3000)); // Wait for 3 seconds before retrying
             }
-            return result.restoreStatus;
+            return true;
         }
         catch (error) {
             if (error.code === 'ECONNREFUSED') {
