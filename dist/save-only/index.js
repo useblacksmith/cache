@@ -139,7 +139,7 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
         // TODO(aayush): Clean this up.
         let archivePath = path.join(yield utils.createTempDirectory(), utils.getCacheFileName(compressionMethod));
         core.debug(`Archive Path: ${archivePath}`);
-        const useCacheManager = true;
+        const useCacheManager = process.env.USE_CACHE_MANAGER === 'true' || false;
         let cacheEntry = null;
         let cacheKey = undefined;
         try {
