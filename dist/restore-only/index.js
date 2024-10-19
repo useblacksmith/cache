@@ -482,7 +482,7 @@ function fetchCacheBlobUsingCacheManager(keys, paths, destinationPath, options) 
             }
             yield new Promise(resolve => setTimeout(resolve, 3000)); // Wait for 3 seconds before retrying
         }
-        return response.cacheId;
+        return result.cacheId;
     });
 }
 exports.fetchCacheBlobUsingCacheManager = fetchCacheBlobUsingCacheManager;
