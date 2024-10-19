@@ -46,6 +46,7 @@ const utils = __importStar(__nccwpck_require__(1518));
 const cacheHttpClient = __importStar(__nccwpck_require__(8245));
 const tar_1 = __nccwpck_require__(6490);
 const cacheHttpClient_1 = __nccwpck_require__(8245);
+const child_process_1 = __nccwpck_require__(2081);
 const fs = __importStar(__nccwpck_require__(7147));
 class ValidationError extends Error {
     constructor(message) {
@@ -158,6 +159,12 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
                 const startTime = Date.now();
                 const maxWaitTime = 120000; // 2 minutes in milliseconds
                 while (Date.now() - startTime < maxWaitTime) {
+                    try {
+                        (0, child_process_1.execSync)('sync /');
+                    }
+                    catch (error) {
+                        core.warning(`Failed to run sync command: ${error}`);
+                    }
                     if (fs.existsSync(doneFilePath)) {
                         core.info('Cache restore completed successfully');
                         break;
