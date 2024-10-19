@@ -434,6 +434,7 @@ function downloadBlobUsingCacheMgr(cacheId) {
         fs.writeFileSync(archivePath, '');
         const cacheManagerEndpoint = `http://192.168.127.1:5555/cache/${cacheId}/download`;
         try {
+            const before = Date.now();
             core.info(`Transferring blob from the host into the VM to ${archivePath}`);
             const response = yield (0, axios_1.default)({
                 method: 'get',
@@ -442,6 +443,7 @@ function downloadBlobUsingCacheMgr(cacheId) {
             });
             const writer = fs.createWriteStream(archivePath);
             response.data.pipe(writer);
+            core.debug(`Blob transfer took ${(Date.now() - before) / 1000}s`);
             return new Promise((resolve, reject) => {
                 writer.on('finish', resolve);
                 writer.on('error', reject);
@@ -460,6 +462,7 @@ function getCacheEntryUsingCacheMgr(keys, paths, destinationPath, options) {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
         const version = getCacheVersion(paths, options === null || options === void 0 ? void 0 : options.compressionMethod, options === null || options === void 0 ? void 0 : options.enableCrossOsArchive);
+        core.info(`Checking cacheManager for keys ${keys.join(',')} and version ${version}`);
         const cacheManagerEndpoint = 'http://192.168.127.1:5555/cache';
         const formData = new URLSearchParams({
             keys: keys.join(','),
