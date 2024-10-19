@@ -422,9 +422,16 @@ function getCacheVersion(paths, compressionMethod, enableCrossOsArchive = false)
 exports.getCacheVersion = getCacheVersion;
 function downloadCacheBlob(cacheId) {
     return __awaiter(this, void 0, void 0, function* () {
-        const archivePath = `/home/runner/blacksmith/${cacheId}`;
+        const archiveDir = '/home/runner/blacksmith';
+        if (!fs.existsSync(archiveDir)) {
+            fs.mkdirSync(archiveDir, { recursive: true });
+        }
+        const archivePath = `${archiveDir}/${cacheId}`;
+        // Create a file to write the cache to.
+        fs.writeFileSync(archivePath, '');
         const cacheManagerEndpoint = `http://192.168.127.1:5555/cache/${cacheId}`;
         try {
+            core.info(`Transferring blob from ${cacheManagerEndpoint} to ${archivePath}`);
             const response = yield (0, axios_1.default)({
                 method: 'get',
                 url: cacheManagerEndpoint,
