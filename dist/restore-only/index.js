@@ -493,6 +493,10 @@ function getCacheEntryUsingCacheMgr(keys, paths, destinationPath, options) {
         if (result.restoreStatus === 'miss') {
             return undefined; // Cache not found, nothing to download
         }
+        if (result.restoreStatus === 'done') {
+            core.info(`Blob found in cache manager; proceeding to direct transfer`);
+            return result;
+        }
         // If the restoreStatus is in_progress, we loop around until it's done or failed.
         if (result.restoreStatus === 'in_progress') {
             const startTime = Date.now();
