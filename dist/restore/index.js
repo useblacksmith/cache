@@ -143,7 +143,7 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
         let cacheEntry = null;
         try {
             if (useCacheManager) {
-                const cacheId = yield cacheHttpClient.fetchCacheBlobUsingCacheManager(keys, paths, archivePath, {
+                const cacheId = yield cacheHttpClient.getCacheEntryUsingCacheMgr(keys, paths, archivePath, {
                     compressionMethod,
                     enableCrossOsArchive
                 });
@@ -151,7 +151,7 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
                     core.info('Did not get a cache hit; proceeding as an uncached run');
                     return undefined;
                 }
-                yield cacheHttpClient.downloadCacheBlob(cacheId);
+                yield cacheHttpClient.downloadBlobUsingCacheMgr(cacheId);
                 archivePath = path.join('/home/runner/blacksmith', cacheId);
             }
             else {
@@ -357,7 +357,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.saveCache = exports.reserveCache = exports.downloadCache = exports.getCacheEntry = exports.fetchCacheBlobUsingCacheManager = exports.downloadCacheBlob = exports.getCacheVersion = exports.createHttpClient = exports.getCacheApiUrl = void 0;
+exports.saveCache = exports.reserveCache = exports.downloadCache = exports.getCacheEntry = exports.getCacheEntryUsingCacheMgr = exports.downloadBlobUsingCacheMgr = exports.getCacheVersion = exports.createHttpClient = exports.getCacheApiUrl = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const http_client_1 = __nccwpck_require__(6255);
 const auth_1 = __nccwpck_require__(5526);
@@ -420,7 +420,7 @@ function getCacheVersion(paths, compressionMethod, enableCrossOsArchive = false)
     return crypto.createHash('sha256').update(components.join('|')).digest('hex');
 }
 exports.getCacheVersion = getCacheVersion;
-function downloadCacheBlob(cacheId) {
+function downloadBlobUsingCacheMgr(cacheId) {
     return __awaiter(this, void 0, void 0, function* () {
         const archiveDir = '/home/runner/blacksmith';
         if (!fs.existsSync(archiveDir)) {
@@ -429,9 +429,9 @@ function downloadCacheBlob(cacheId) {
         const archivePath = `${archiveDir}/${cacheId}`;
         // Create a file to write the cache to.
         fs.writeFileSync(archivePath, '');
-        const cacheManagerEndpoint = `http://192.168.127.1:5555/cache/${cacheId}`;
+        const cacheManagerEndpoint = `http://192.168.127.1:5555/cache/${cacheId}/download`;
         try {
-            core.info(`Transferring blob from ${cacheManagerEndpoint} to ${archivePath}`);
+            core.info(`Transferring blob from the host into the VM to ${archivePath}`);
             const response = yield (0, axios_1.default)({
                 method: 'get',
                 url: cacheManagerEndpoint,
@@ -449,8 +449,11 @@ function downloadCacheBlob(cacheId) {
         }
     });
 }
-exports.downloadCacheBlob = downloadCacheBlob;
-function fetchCacheBlobUsingCacheManager(keys, paths, destinationPath, options) {
+exports.downloadBlobUsingCacheMgr = downloadBlobUsingCacheMgr;
+// getCacheEntryUsingCacheMgr is used to get the cache entry from the cache manager.
+// It asks the cache manager to check whether the cache key exists and if it does, it waits
+// until the cache manager reports that the cache key is ready to be downloaded.
+function getCacheEntryUsingCacheMgr(keys, paths, destinationPath, options) {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
         const version = getCacheVersion(paths, options === null || options === void 0 ? void 0 : options.compressionMethod, options === null || options === void 0 ? void 0 : options.enableCrossOsArchive);
@@ -460,44 +463,53 @@ function fetchCacheBlobUsingCacheManager(keys, paths, destinationPath, options) 
             version,
             destinationPath
         });
-        const startTime = Date.now();
-        const maxWaitTime = 120000; // 2 minutes in milliseconds
-        let result;
         let response;
-        while (true) {
-            try {
-                response = yield axios_1.default.post(cacheManagerEndpoint, formData, {
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        Authorization: `Bearer ${process.env['BLACKSMITH_CACHE_TOKEN']}`,
-                        'X-Github-Repo-Name': process.env['GITHUB_REPO_NAME'] || ''
-                    },
-                    timeout: 10000 // 10 seconds timeout
-                });
+        try {
+            response = yield axios_1.default.post(cacheManagerEndpoint, formData, {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    Authorization: `Bearer ${process.env['BLACKSMITH_CACHE_TOKEN']}`,
+                    'X-Github-Repo-Name': process.env['GITHUB_REPO_NAME'] || ''
+                },
+                timeout: 10000 // 10 seconds timeout
+            });
+        }
+        catch (error) {
+            if ((0, axios_1.isAxiosError)(error) && ((_a = error.response) === null || _a === void 0 ? void 0 : _a.status) === 404) {
+                return undefined;
             }
-            catch (error) {
-                if ((0, axios_1.isAxiosError)(error) && ((_a = error.response) === null || _a === void 0 ? void 0 : _a.status) === 404) {
+            throw error;
+        }
+        if (response.status !== 200) {
+            throw new Error(`Cache service responded with ${response.status}`);
+        }
+        const result = response.data;
+        if (result.restoreStatus === 'miss') {
+            return undefined; // Cache not found, nothing to download
+        }
+        // If the restoreStatus is in_progress, we loop around until it's done or failed.
+        if (result.restoreStatus === 'in_progress') {
+            const startTime = Date.now();
+            const maxWaitTime = 5 * 60 * 1000; // 5 minutes in milliseconds
+            while (Date.now() - startTime < maxWaitTime) {
+                yield new Promise(resolve => setTimeout(resolve, 1000));
+                response = yield axios_1.default.get(`${cacheManagerEndpoint}/${result.cacheId}`);
+                const status = response.data.status;
+                if (status === 'done') {
+                    return result.cacheId;
+                }
+                if (status === 'failed') {
+                    core.warning(`Cache restore failed`);
                     return undefined;
                 }
-                throw error;
             }
-            if (response.status !== 200) {
-                throw new Error(`Cache service responded with ${response.status}`);
-            }
-            result = response.data;
-            core.info(`Cache restore status: ${JSON.stringify(result)}`);
-            if (result.restoreStatus !== 'in_progress') {
-                break;
-            }
-            if (Date.now() - startTime >= maxWaitTime) {
-                throw new Error('Cache restore timed out after 2 minutes');
-            }
-            yield new Promise(resolve => setTimeout(resolve, 3000)); // Wait for 3 seconds before retrying
+            core.warning(`Cache restore timed out after 5 minutes`);
+            return undefined;
         }
         return result.cacheId;
     });
 }
-exports.fetchCacheBlobUsingCacheManager = fetchCacheBlobUsingCacheManager;
+exports.getCacheEntryUsingCacheMgr = getCacheEntryUsingCacheMgr;
 function getCacheEntry(keys, paths, options) {
     return __awaiter(this, void 0, void 0, function* () {
         const version = getCacheVersion(paths, options === null || options === void 0 ? void 0 : options.compressionMethod, options === null || options === void 0 ? void 0 : options.enableCrossOsArchive);
