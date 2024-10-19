@@ -445,7 +445,10 @@ function downloadBlobUsingCacheMgr(cacheId) {
             response.data.pipe(writer);
             return new Promise((resolve, reject) => {
                 writer.on('finish', () => {
-                    core.info(`Blob transfer completed in ${(Date.now() - before) / 1000}s`);
+                    const duration = (Date.now() - before) / 1000;
+                    const fileSizeInBytes = fs.statSync(archivePath).size;
+                    const speedMBps = fileSizeInBytes / (1024 * 1024) / duration;
+                    core.info(`Blob transfer completed in ${duration.toFixed(2)}s (${speedMBps.toFixed(2)} MB/s)`);
                     resolve();
                 });
                 writer.on('error', reject);
