@@ -353,9 +353,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.saveCache = exports.reserveCache = exports.downloadCache = exports.getCacheEntry = exports.fetchCacheBlobUsingCacheManager = exports.getCacheVersion = exports.createHttpClient = exports.getCacheApiUrl = void 0;
 const core = __importStar(__nccwpck_require__(2186));
@@ -368,7 +365,7 @@ const utils = __importStar(__nccwpck_require__(1518));
 const downloadUtils_1 = __nccwpck_require__(5500);
 const options_1 = __nccwpck_require__(6215);
 const requestUtils_1 = __nccwpck_require__(3981);
-const axios_1 = __importDefault(__nccwpck_require__(8757));
+const axios_1 = __importStar(__nccwpck_require__(8757));
 const versionSalt = '1.0';
 function getCacheApiUrl(resource) {
     var _a, _b;
@@ -421,6 +418,7 @@ function getCacheVersion(paths, compressionMethod, enableCrossOsArchive = false)
 }
 exports.getCacheVersion = getCacheVersion;
 function fetchCacheBlobUsingCacheManager(keys, paths, destinationPath, options) {
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
         const version = getCacheVersion(paths, options === null || options === void 0 ? void 0 : options.compressionMethod, options === null || options === void 0 ? void 0 : options.enableCrossOsArchive);
         const cacheManagerEndpoint = 'http://192.168.127.1:5555/cache';
@@ -429,12 +427,13 @@ function fetchCacheBlobUsingCacheManager(keys, paths, destinationPath, options) 
             version,
             destinationPath
         });
-        try {
-            const startTime = Date.now();
-            const maxWaitTime = 120000; // 2 minutes in milliseconds
-            let result;
-            while (true) {
-                const response = yield axios_1.default.post(cacheManagerEndpoint, formData, {
+        const startTime = Date.now();
+        const maxWaitTime = 120000; // 2 minutes in milliseconds
+        let result;
+        let response;
+        while (true) {
+            try {
+                response = yield axios_1.default.post(cacheManagerEndpoint, formData, {
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
                         Authorization: `Bearer ${process.env['BLACKSMITH_CACHE_TOKEN']}`,
@@ -442,33 +441,27 @@ function fetchCacheBlobUsingCacheManager(keys, paths, destinationPath, options) 
                     },
                     timeout: 10000 // 10 seconds timeout
                 });
-                if (response.status === 404) {
+            }
+            catch (error) {
+                if ((0, axios_1.isAxiosError)(error) && ((_a = error.response) === null || _a === void 0 ? void 0 : _a.status) === 404) {
                     return false;
                 }
-                if (response.status !== 200) {
-                    throw new Error(`Cache service responded with ${response.status}`);
-                }
-                result = response.data;
-                core.info(`Cache restore status: ${JSON.stringify(result)}`);
-                if (result.restoreStatus !== 'in_progress') {
-                    break;
-                }
-                if (Date.now() - startTime >= maxWaitTime) {
-                    throw new Error('Cache restore timed out after 2 minutes');
-                }
-                yield new Promise(resolve => setTimeout(resolve, 3000)); // Wait for 3 seconds before retrying
+                throw error;
             }
-            return true;
+            if (response.status !== 200) {
+                throw new Error(`Cache service responded with ${response.status}`);
+            }
+            result = response.data;
+            core.info(`Cache restore status: ${JSON.stringify(result)}`);
+            if (result.restoreStatus !== 'in_progress') {
+                break;
+            }
+            if (Date.now() - startTime >= maxWaitTime) {
+                throw new Error('Cache restore timed out after 2 minutes');
+            }
+            yield new Promise(resolve => setTimeout(resolve, 3000)); // Wait for 3 seconds before retrying
         }
-        catch (error) {
-            if (error.code === 'ECONNREFUSED') {
-                core.warning('Connection to cache manager refused. Ensure the cache manager is running and accessible.');
-            }
-            else {
-                core.warning(`Failed to fetch cache blob: ${error}`);
-            }
-            throw error;
-        }
+        return true;
     });
 }
 exports.fetchCacheBlobUsingCacheManager = fetchCacheBlobUsingCacheManager;
