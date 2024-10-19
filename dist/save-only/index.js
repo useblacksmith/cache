@@ -152,9 +152,9 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
                     core.info('Did not get a cache hit; proceeding as an uncached run');
                     return undefined;
                 }
-                archivePath = path.join('/blacksmith', cacheId);
-                const doneFilePath = path.join('/blacksmith', `${cacheId}_done`);
-                const errorFilePath = path.join('/blacksmith', `${cacheId}_error`);
+                archivePath = `/blacksmith/${cacheId}`;
+                const doneFilePath = `/blacksmith/${cacheId}_done`;
+                const errorFilePath = `/blacksmith/${cacheId}_error`;
                 const startTime = Date.now();
                 const maxWaitTime = 120000; // 2 minutes in milliseconds
                 while (Date.now() - startTime < maxWaitTime) {
