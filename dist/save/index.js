@@ -443,9 +443,11 @@ function downloadBlobUsingCacheMgr(cacheId) {
             });
             const writer = fs.createWriteStream(archivePath);
             response.data.pipe(writer);
-            core.info(`Blob transfer took ${(Date.now() - before) / 1000}s to complete`);
             return new Promise((resolve, reject) => {
-                writer.on('finish', resolve);
+                writer.on('finish', () => {
+                    core.info(`Blob transfer completed in ${(Date.now() - before) / 1000}s`);
+                    resolve();
+                });
                 writer.on('error', reject);
             });
         }
