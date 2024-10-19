@@ -141,18 +141,20 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
         core.debug(`Archive Path: ${archivePath}`);
         const useCacheManager = true;
         let cacheEntry = null;
+        let cacheKey = undefined;
         try {
             if (useCacheManager) {
-                const cacheId = yield cacheHttpClient.getCacheEntryUsingCacheMgr(keys, paths, archivePath, {
+                const cacheEntry = yield cacheHttpClient.getCacheEntryUsingCacheMgr(keys, paths, archivePath, {
                     compressionMethod,
                     enableCrossOsArchive
                 });
-                if (!cacheId) {
+                if (!cacheEntry) {
                     core.info('Did not get a cache hit; proceeding as an uncached run');
                     return undefined;
                 }
-                yield cacheHttpClient.downloadBlobUsingCacheMgr(cacheId);
-                archivePath = path.join('/home/runner/blacksmith', cacheId);
+                yield cacheHttpClient.downloadBlobUsingCacheMgr(cacheEntry.cacheId);
+                archivePath = path.join('/home/runner/blacksmith', cacheEntry.cacheId);
+                cacheKey = cacheEntry.cacheKey;
             }
             else {
                 // path are needed to compute version
@@ -164,6 +166,7 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
                     // Cache not found
                     return undefined;
                 }
+                cacheKey = cacheEntry.cacheKey;
                 if (options === null || options === void 0 ? void 0 : options.lookupOnly) {
                     core.info('Lookup only - skipping download');
                     return cacheEntry.cacheKey;
@@ -178,7 +181,7 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
             core.info(`Cache Size: ~${Math.round(archiveFileSize / (1024 * 1024))} MB (${archiveFileSize} B)`);
             yield (0, tar_1.extractTar)(archivePath, compressionMethod);
             core.info('Cache restored successfully');
-            return cacheEntry === null || cacheEntry === void 0 ? void 0 : cacheEntry.cacheKey;
+            return cacheKey;
         }
         catch (error) {
             const typedError = error;
@@ -496,7 +499,7 @@ function getCacheEntryUsingCacheMgr(keys, paths, destinationPath, options) {
                 response = yield axios_1.default.get(`${cacheManagerEndpoint}/${result.cacheId}`);
                 const status = response.data.status;
                 if (status === 'done') {
-                    return result.cacheId;
+                    return result;
                 }
                 if (status === 'failed') {
                     core.warning(`Cache restore failed`);
@@ -506,7 +509,7 @@ function getCacheEntryUsingCacheMgr(keys, paths, destinationPath, options) {
             core.warning(`Cache restore timed out after 5 minutes`);
             return undefined;
         }
-        return result.cacheId;
+        return result;
     });
 }
 exports.getCacheEntryUsingCacheMgr = getCacheEntryUsingCacheMgr;
