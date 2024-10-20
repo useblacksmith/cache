@@ -433,7 +433,7 @@ function mountSharedNFSVolume() {
         if (!fs.existsSync(mountPoint)) {
             fs.mkdirSync(mountPoint, { recursive: true });
         }
-        const mountCommand = `sudo mount -t nfs -o nconnect=8 192.168.127.1:/blacksmith/cache ${mountPoint}`;
+        const mountCommand = `sudo mount -t nfs -o nconnect=16 192.168.127.1:/blacksmith/cache ${mountPoint}`;
         try {
             (0, child_process_1.execSync)(mountCommand);
             core.info(`NFS volume mounted successfully at ${mountPoint}`);
