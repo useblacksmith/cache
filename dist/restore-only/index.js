@@ -152,8 +152,10 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
                     core.info('Did not get a cache hit; proceeding as an uncached run');
                     return undefined;
                 }
-                yield cacheHttpClient.downloadBlobUsingCacheMgr(cacheEntry.cacheId);
+                // await cacheHttpClient.downloadBlobUsingCacheMgr(cacheEntry.cacheId)
                 archivePath = path.join('/home/runner/blacksmith', cacheEntry.cacheId);
+                yield cacheHttpClient.mountSharedNFSVolume();
+                yield cacheHttpClient.waitForArchiveToBeAvailable(cacheEntry.cacheId);
                 cacheKey = cacheEntry.cacheKey;
             }
             else {
@@ -360,7 +362,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.saveCache = exports.reserveCache = exports.downloadCache = exports.getCacheEntry = exports.getCacheEntryUsingCacheMgr = exports.downloadBlobUsingCacheMgr = exports.getCacheVersion = exports.createHttpClient = exports.getCacheApiUrl = void 0;
+exports.saveCache = exports.reserveCache = exports.downloadCache = exports.getCacheEntry = exports.getCacheEntryUsingCacheMgr = exports.downloadBlobUsingCacheMgr = exports.waitForArchiveToBeAvailable = exports.mountSharedNFSVolume = exports.getCacheVersion = exports.createHttpClient = exports.getCacheApiUrl = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const http_client_1 = __nccwpck_require__(6255);
 const auth_1 = __nccwpck_require__(5526);
@@ -372,6 +374,7 @@ const downloadUtils_1 = __nccwpck_require__(5500);
 const options_1 = __nccwpck_require__(6215);
 const requestUtils_1 = __nccwpck_require__(3981);
 const axios_1 = __importStar(__nccwpck_require__(8757));
+const child_process_1 = __nccwpck_require__(2081);
 const versionSalt = '1.0';
 function getCacheApiUrl(resource) {
     var _a, _b;
@@ -423,6 +426,40 @@ function getCacheVersion(paths, compressionMethod, enableCrossOsArchive = false)
     return crypto.createHash('sha256').update(components.join('|')).digest('hex');
 }
 exports.getCacheVersion = getCacheVersion;
+function mountSharedNFSVolume() {
+    return __awaiter(this, void 0, void 0, function* () {
+        const mountPoint = '/home/runner/blacksmith';
+        // Create the mount point directory if it doesn't exist
+        if (!fs.existsSync(mountPoint)) {
+            fs.mkdirSync(mountPoint, { recursive: true });
+        }
+        const mountCommand = `sudo mount -t nfs -o nconnect=8 192.168.127.1:/blacksmith/cache ${mountPoint}`;
+        try {
+            (0, child_process_1.execSync)(mountCommand);
+            core.info(`NFS volume mounted successfully at ${mountPoint}`);
+        }
+        catch (error) {
+            core.error(`Failed to mount NFS volume: ${error}`);
+            throw error;
+        }
+    });
+}
+exports.mountSharedNFSVolume = mountSharedNFSVolume;
+function waitForArchiveToBeAvailable(cacheId) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const cacheFilePath = `/home/runner/blacksmith/${cacheId}`;
+        const doneFilePath = `${cacheFilePath}_done`;
+        const startTime = Date.now();
+        const timeoutMs = 2 * 60 * 1000; // 2 minutes in milliseconds
+        while (!fs.existsSync(doneFilePath)) {
+            if (Date.now() - startTime > timeoutMs) {
+                throw new Error(`Timeout waiting for ${doneFilePath} to appear`);
+            }
+            yield new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    });
+}
+exports.waitForArchiveToBeAvailable = waitForArchiveToBeAvailable;
 function downloadBlobUsingCacheMgr(cacheId) {
     return __awaiter(this, void 0, void 0, function* () {
         const archiveDir = '/home/runner/blacksmith';
