@@ -181,7 +181,11 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
             }
             const archiveFileSize = utils.getArchiveFileSizeInBytes(archivePath);
             core.info(`Cache Size: ~${Math.round(archiveFileSize / (1024 * 1024))} MB (${archiveFileSize} B)`);
+            const extractStartTime = Date.now();
             yield (0, tar_1.extractTar)(archivePath, compressionMethod);
+            const extractEndTime = Date.now();
+            const extractionTimeSeconds = (extractEndTime - extractStartTime) / 1000;
+            core.info(`Cache extraction completed in ${extractionTimeSeconds.toFixed(2)} seconds`);
             core.info('Cache restored successfully');
             return cacheKey;
         }
