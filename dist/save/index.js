@@ -579,7 +579,8 @@ function getCacheEntry(keys, paths, options) {
                     headers: {
                         Accept: createAcceptHeader('application/json', '6.0-preview.1'),
                         'X-Github-Repo-Name': process.env['GITHUB_REPO_NAME'],
-                        Authorization: `Bearer ${process.env['BLACKSMITH_CACHE_TOKEN']}`
+                        Authorization: `Bearer ${process.env['BLACKSMITH_CACHE_TOKEN']}`,
+                        'X-Cache-Region': process.env['BLACKSMITH_REGION']
                     },
                     timeout: 3000 // 3 seconds timeout
                 });
@@ -687,7 +688,9 @@ function reserveCache(key, paths, options) {
             cacheSize: options === null || options === void 0 ? void 0 : options.cacheSize
         };
         const response = yield (0, requestUtils_1.retryTypedResponse)('reserveCache', () => __awaiter(this, void 0, void 0, function* () {
-            return httpClient.postJson(getCacheApiUrl('caches'), reserveCacheRequest);
+            return httpClient.postJson(getCacheApiUrl('caches'), reserveCacheRequest, {
+                'X-Cache-Region': process.env['BLACKSMITH_REGION']
+            });
         }));
         return response;
     });
