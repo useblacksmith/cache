@@ -383,6 +383,7 @@ const versionSalt = '1.0';
 function getCacheApiUrl(resource) {
     var _a, _b;
     let baseUrl = process.env.BLACKSMITH_CACHE_URL;
+    core.info(`cache backend url: ${baseUrl}`);
     if (!baseUrl) {
         baseUrl = ((_a = process.env.PETNAME) === null || _a === void 0 ? void 0 : _a.includes('staging'))
             ? 'https://stagingapi.blacksmith.sh/cache'
