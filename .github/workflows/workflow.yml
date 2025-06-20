@@ -15,7 +15,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [blacksmith-4vcpu-ubuntu-2204, windows-latest, macOS-latest]
+        os: [blacksmith-4vcpu-ubuntu-2404, windows-latest, macOS-latest]
       fail-fast: false
     runs-on: ${{ matrix.os }}
     steps:
@@ -38,7 +38,7 @@ jobs:
   test-save:
     strategy:
       matrix:
-        os: [blacksmith-4vcpu-ubuntu-2204, windows-latest, macOS-latest]
+        os: [blacksmith-4vcpu-ubuntu-2404, windows-latest, macOS-latest]
       fail-fast: false
     runs-on: ${{ matrix.os }}
     steps:
@@ -61,7 +61,7 @@ jobs:
     needs: test-save
     strategy:
       matrix:
-        os: [blacksmith-4vcpu-ubuntu-2204, windows-latest, macOS-latest]
+        os: [blacksmith-4vcpu-ubuntu-2404, windows-latest, macOS-latest]
       fail-fast: false
     runs-on: ${{ matrix.os }}
     steps:
@@ -83,7 +83,7 @@ jobs:
 
   # End to end with proxy
   test-proxy-save:
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     container:
       image: ubuntu:latest
       options: --dns 127.0.0.1
@@ -106,7 +106,7 @@ jobs:
         path: test-cache
   test-proxy-restore:
     needs: test-proxy-save
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     container:
       image: ubuntu:latest
       options: --dns 127.0.0.1
