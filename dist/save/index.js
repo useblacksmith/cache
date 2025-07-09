@@ -351,7 +351,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.saveCache = exports.reserveCache = exports.downloadCache = exports.getCacheEntryAxios = exports.getCacheEntry = exports.getCacheVersion = exports.createHttpClient = exports.getCacheApiUrl = void 0;
+exports.saveCache = exports.reserveCache = exports.downloadCache = exports.getCacheEntryAxios = exports.getCacheEntry = exports.getCacheVersion = exports.createHttpClient = exports.getCacheApiUrl = exports.getCacheRequestHeaders = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const http_client_1 = __nccwpck_require__(6255);
 const auth_1 = __nccwpck_require__(5526);
@@ -365,6 +365,19 @@ const requestUtils_1 = __nccwpck_require__(3981);
 const node_fetch_1 = __importDefault(__nccwpck_require__(4108));
 const axios_1 = __importDefault(__nccwpck_require__(8757));
 const versionSalt = '1.0';
+function getCacheRequestHeaders() {
+    var _a, _b, _c, _d;
+    return {
+        Accept: createAcceptHeader('application/json', '6.0-preview.1'),
+        Authorization: `Bearer ${process.env.BLACKSMITH_CACHE_TOKEN}`,
+        'X-Github-Repo-Name': (_a = process.env.GITHUB_REPO_NAME) !== null && _a !== void 0 ? _a : '',
+        'X-Blacksmith-VM-ID': (_b = process.env.BLACKSMITH_VM_ID) !== null && _b !== void 0 ? _b : '',
+        'X-Blacksmith-Raw-VM-ID': (_c = process.env.VM_ID) !== null && _c !== void 0 ? _c : '',
+        'X-Cache-Region': (_d = process.env.BLACKSMITH_REGION) !== null && _d !== void 0 ? _d : 'eu-central',
+        'User-Agent': 'axios/cache/v5'
+    };
+}
+exports.getCacheRequestHeaders = getCacheRequestHeaders;
 function getCacheApiUrl(resource) {
     var _a, _b;
     let baseUrl = process.env.BLACKSMITH_CACHE_URL;
@@ -497,30 +510,19 @@ function getCacheEntry(keys, paths, options) {
 }
 exports.getCacheEntry = getCacheEntry;
 function getCacheEntryAxios(keys, paths, options) {
-    var _a, _b;
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
         const version = getCacheVersion(paths, options === null || options === void 0 ? void 0 : options.compressionMethod, options === null || options === void 0 ? void 0 : options.enableCrossOsArchive);
         const resource = `?keys=${encodeURIComponent(keys.join(','))}&version=${version}`;
         const maxRetries = 3;
         let retries = 0;
-        const cacheToken = process.env.BLACKSMITH_CACHE_TOKEN;
-        const repoName = process.env.GITHUB_REPO_NAME;
-        const blacksmithVMID = process.env.BLACKSMITH_VM_ID;
-        const rawVMID = process.env.VM_ID;
-        core.info(`Checking cache for keys ${keys.join(',')} and version ${version} using single-use cache token for repo ${repoName}: ${cacheToken}`);
+        const headers = getCacheRequestHeaders();
+        core.info(`Checking cache for keys ${keys.join(',')} and version ${version} using single-use cache token for repo ${headers['X-Github-Repo-Name']}: ${headers['Authorization']}`);
         while (retries <= maxRetries) {
             try {
                 const before = Date.now();
                 const response = yield axios_1.default.get(getCacheApiUrl(resource), {
-                    headers: {
-                        Accept: createAcceptHeader('application/json', '6.0-preview.1'),
-                        'X-Github-Repo-Name': repoName || '',
-                        Authorization: `Bearer ${cacheToken}`,
-                        'X-Cache-Region': (_a = process.env.BLACKSMITH_REGION) !== null && _a !== void 0 ? _a : 'eu-central',
-                        'User-Agent': 'axios/cache',
-                        'X-Blacksmith-VM-ID': blacksmithVMID || '',
-                        'X-Blacksmith-Raw-VM-ID': rawVMID || ''
-                    },
+                    headers,
                     timeout: 3000,
                     validateStatus: () => true // Don't throw on non-2xx status codes
                 });
@@ -549,7 +551,7 @@ function getCacheEntryAxios(keys, paths, options) {
             }
             catch (error) {
                 const isTimeout = error.code === 'ECONNABORTED';
-                const status = (_b = error.response) === null || _b === void 0 ? void 0 : _b.status;
+                const status = (_a = error.response) === null || _a === void 0 ? void 0 : _a.status;
                 if ((status && status >= 500) || isTimeout) {
                     retries++;
                     if (retries <= maxRetries) {
