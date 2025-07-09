@@ -143,7 +143,7 @@ function restoreCache(paths, primaryKey, restoreKeys, options, enableCrossOsArch
         let cacheKey = undefined;
         try {
             // path are needed to compute version
-            cacheEntry = yield cacheHttpClient.getCacheEntry(keys, paths, {
+            cacheEntry = yield cacheHttpClient.getCacheEntryAxios(keys, paths, {
                 compressionMethod,
                 enableCrossOsArchive
             });
@@ -351,7 +351,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.saveCache = exports.reserveCache = exports.downloadCache = exports.getCacheEntry = exports.getCacheVersion = exports.createHttpClient = exports.getCacheApiUrl = void 0;
+exports.saveCache = exports.reserveCache = exports.downloadCache = exports.getCacheEntryAxios = exports.getCacheEntry = exports.getCacheVersion = exports.createHttpClient = exports.getCacheApiUrl = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const http_client_1 = __nccwpck_require__(6255);
 const auth_1 = __nccwpck_require__(5526);
@@ -363,6 +363,7 @@ const downloadUtils_1 = __nccwpck_require__(5500);
 const options_1 = __nccwpck_require__(6215);
 const requestUtils_1 = __nccwpck_require__(3981);
 const node_fetch_1 = __importDefault(__nccwpck_require__(4108));
+const axios_1 = __importDefault(__nccwpck_require__(8757));
 const versionSalt = '1.0';
 function getCacheApiUrl(resource) {
     var _a, _b;
@@ -436,7 +437,8 @@ function getCacheEntry(keys, paths, options) {
                         Accept: createAcceptHeader('application/json', '6.0-preview.1'),
                         'X-Github-Repo-Name': repoName || '',
                         Authorization: `Bearer ${cacheToken}`,
-                        'X-Cache-Region': (_a = process.env['BLACKSMITH_REGION']) !== null && _a !== void 0 ? _a : 'eu-central'
+                        'X-Cache-Region': (_a = process.env['BLACKSMITH_REGION']) !== null && _a !== void 0 ? _a : 'eu-central',
+                        'User-Agent': 'node-fetch/cache'
                     },
                     signal: controller.signal
                 });
@@ -494,6 +496,83 @@ function getCacheEntry(keys, paths, options) {
     });
 }
 exports.getCacheEntry = getCacheEntry;
+function getCacheEntryAxios(keys, paths, options) {
+    var _a, _b;
+    return __awaiter(this, void 0, void 0, function* () {
+        const version = getCacheVersion(paths, options === null || options === void 0 ? void 0 : options.compressionMethod, options === null || options === void 0 ? void 0 : options.enableCrossOsArchive);
+        const resource = `?keys=${encodeURIComponent(keys.join(','))}&version=${version}`;
+        const maxRetries = 3;
+        let retries = 0;
+        const cacheToken = process.env['BLACKSMITH_CACHE_TOKEN'];
+        const repoName = process.env['GITHUB_REPO_NAME'];
+        core.info(`Checking cache for keys ${keys.join(',')} and version ${version} using single-use cache token for repo ${repoName}: ${cacheToken}`);
+        while (retries <= maxRetries) {
+            try {
+                const before = Date.now();
+                const response = yield axios_1.default.get(getCacheApiUrl(resource), {
+                    headers: {
+                        Accept: createAcceptHeader('application/json', '6.0-preview.1'),
+                        'X-Github-Repo-Name': repoName || '',
+                        Authorization: `Bearer ${cacheToken}`,
+                        'X-Cache-Region': (_a = process.env['BLACKSMITH_REGION']) !== null && _a !== void 0 ? _a : 'eu-central',
+                        'User-Agent': 'axios/cache'
+                    },
+                    timeout: 3000,
+                    validateStatus: () => true // Don't throw on non-2xx status codes
+                });
+                core.debug(`Cache lookup took ${Date.now() - before}ms`);
+                // Cache not found
+                if (response.status === 204) {
+                    // List cache for primary key only if cache miss occurs
+                    if (core.isDebug()) {
+                        yield printCachesListForDiagnostics(keys[0], createHttpClient(), version);
+                    }
+                    return null;
+                }
+                if (response.status < 200 || response.status >= 300) {
+                    throw new Error(`Cache service responded with ${response.status}`);
+                }
+                const cacheResult = response.data;
+                const cacheDownloadUrl = cacheResult === null || cacheResult === void 0 ? void 0 : cacheResult.archiveLocation;
+                if (!cacheDownloadUrl) {
+                    // Cache archiveLocation not found. This should never happen, and hence bail out.
+                    throw new Error('Cache not found.');
+                }
+                core.setSecret(cacheDownloadUrl);
+                core.debug(`Cache Result:`);
+                core.debug(JSON.stringify(cacheResult));
+                return cacheResult;
+            }
+            catch (error) {
+                const isTimeout = error.code === 'ECONNABORTED';
+                const status = (_b = error.response) === null || _b === void 0 ? void 0 : _b.status;
+                if ((status && status >= 500) || isTimeout) {
+                    retries++;
+                    if (retries <= maxRetries) {
+                        if (isTimeout) {
+                            core.warning(`Request timed out. Retrying (attempt ${retries} of ${maxRetries})`);
+                        }
+                        else {
+                            core.warning(`Retrying due to error: ${error.message} (attempt ${retries} of ${maxRetries})`);
+                        }
+                        continue;
+                    }
+                }
+                if (status) {
+                    throw new Error(`Cache service responded with ${status}`);
+                }
+                else if (isTimeout) {
+                    throw new Error('Request timed out after 3 seconds');
+                }
+                else {
+                    throw error;
+                }
+            }
+        }
+        throw new Error(`Failed to get cache entry after ${maxRetries} retries`);
+    });
+}
+exports.getCacheEntryAxios = getCacheEntryAxios;
 function printCachesListForDiagnostics(key, httpClient, version) {
     return __awaiter(this, void 0, void 0, function* () {
         const resource = `caches?key=${encodeURIComponent(key)}`;
